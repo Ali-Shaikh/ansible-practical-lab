@@ -1,0 +1,10 @@
+# Keep shell scripts and Docker entrypoints LF so they run inside Linux
+# containers even when the repo is cloned on Windows.
+* text=auto eol=lf
+
+# PowerShell wrapper is Windows-native; keep CRLF.
+*.ps1 text eol=crlf
+
+# Binary-ish artefacts should not be normalised.
+*.png binary
+*.jpg binary

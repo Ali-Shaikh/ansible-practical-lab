@@ -1,0 +1,12 @@
+.env
+.lab/*
+!.lab/ssh/
+.lab/ssh/*
+!.lab/ssh/.gitkeep
+.ansible/
+*.retry
+__pycache__/
+.DS_Store
+Thumbs.db
+.idea/
+.local/
