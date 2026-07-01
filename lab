@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+COMMAND="${1:-help}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+compose() {
+  docker compose "$@"
+}
+
+ensure_lab_key() {
+  local key_dir="$ROOT_DIR/.lab/ssh"
+  local key_file="$key_dir/id_ed25519"
+  mkdir -p "$key_dir"
+  if [[ ! -f "$key_file" ]]; then
+    if ! command -v ssh-keygen >/dev/null 2>&1; then
+      echo "ssh-keygen is required to create the lab SSH key."
+      exit 1
+    fi
+    ssh-keygen -t ed25519 -N "" -C "ansible-practical-lab" -f "$key_file" >/dev/null
+  fi
+  cp "$key_file.pub" "$key_dir/authorized_keys"
+  chmod 700 "$key_dir"
+  chmod 600 "$key_file" "$key_dir/authorized_keys"
+  chmod 644 "$key_file.pub"
+}
+
+run_forge() {
+  compose run --rm forge "$@"
+}
+
+case "$COMMAND" in
+  doctor)
+    bash scripts/doctor.sh
+    ;;
+  up)
+    ensure_lab_key
+    compose build forge
+    compose up -d --build atlas beacon ledger vaultbox
+    ;;
+  down)
+    compose down
+    ;;
+  reset)
+    compose down --volumes --remove-orphans
+    ensure_lab_key
+    compose build forge
+    compose up -d --build atlas beacon ledger vaultbox
+    ;;
+  status)
+    compose ps
+    ;;
+  ping)
+    run_forge ansible all -i inventory/lab.yml -m ansible.builtin.ping
+    ;;
+  facts)
+    run_forge ansible-playbook -i inventory/lab.yml playbooks/01_facts.yml
+    ;;
+  play)
+    if [[ $# -lt 1 ]]; then
+      echo "Usage: ./lab play <playbook> [extra ansible-playbook args]"
+      exit 2
+    fi
+    run_forge ansible-playbook -i inventory/lab.yml "$@"
+    ;;
+  shell)
+    run_forge bash
+    ;;
+  logs)
+    compose logs "$@"
+    ;;
+  help|-h|--help)
+    cat <<'HELP'
+Usage: ./lab <command>
+
+Commands:
+  doctor   Check local prerequisites
+  up       Build and start the lab
+  down     Stop and remove lab containers
+  reset    Rebuild the lab from scratch
+  status   Show container status
+  ping     Run ansible.builtin.ping against all managed hosts
+  facts    Gather a few useful facts from all managed hosts
+  play     Run a playbook through the control-node container
+  shell    Open a shell in the control-node container
+  logs     Show Docker Compose logs
+HELP
+    ;;
+  *)
+    echo "Unknown command: $COMMAND"
+    echo "Run ./lab help"
+    exit 2
+    ;;
+esac

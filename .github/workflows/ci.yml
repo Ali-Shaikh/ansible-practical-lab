@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: |
+          bash -n lab
+          bash -n scripts/doctor.sh
+          bash -n docker/managed-host/entrypoint.sh
+          bash -n docker/control-node/entrypoint.sh
+
+      - name: Validate Compose file
+        run: docker compose config
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pipx
+          pipx install --include-deps ansible
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Galaxy collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Validate playbook syntax
+        run: |
+          ansible-playbook -i inventory/lab.yml playbooks/00_ping.yml --syntax-check
+          ansible-playbook -i inventory/lab.yml playbooks/01_facts.yml --syntax-check
+          ansible-playbook -i inventory/lab.yml playbooks/10_baseline.yml --syntax-check

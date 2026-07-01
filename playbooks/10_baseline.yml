@@ -1,0 +1,32 @@
+---
+- name: Apply a small baseline to Linux hosts
+  hosts: linux
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install baseline packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - vim-tiny
+        state: present
+        update_cache: true
+
+    - name: Create a managed directory
+      ansible.builtin.file:
+        path: /opt/ansible-lab
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Write a lab message of the day
+      ansible.builtin.copy:
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          Managed by Ansible in the Practical Ansible lab.

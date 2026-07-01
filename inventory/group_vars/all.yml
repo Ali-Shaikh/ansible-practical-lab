@@ -1,0 +1,9 @@
+---
+# Shared connection settings for both inventories.
+# The SSH private key path differs by where Ansible runs from, so each
+# inventory file sets ansible_ssh_private_key_file itself:
+#   - inventory/lab.yml   -> /tmp/lab-ssh/id_ed25519 (inside the forge container)
+#   - inventory/local.yml -> .lab/ssh/id_ed25519     (on the host)
+ansible_user: learner
+ansible_python_interpreter: /usr/bin/python3
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"

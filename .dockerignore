@@ -1,0 +1,15 @@
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.local
+.lab
+.env
+.env.example
+docs
+tests
+README.md
+**/__pycache__
+.DS_Store
+Thumbs.db
