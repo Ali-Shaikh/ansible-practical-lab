@@ -197,16 +197,26 @@ case "$COMMAND" in
     compose up -d --build
     ;;
   down)
-    compose down --remove-orphans
+    # --profile studio so the optional studio container is torn down too.
+    compose --profile studio down --remove-orphans
     ;;
   reset)
-    compose down --volumes --remove-orphans
+    compose --profile studio down --volumes --remove-orphans
     ensure_lab_key
     compose build forge
     compose up -d --build
     ;;
   status)
-    compose ps
+    compose --profile studio ps
+    ;;
+  studio)
+    ensure_lab_key
+    compose up -d --build studio
+    echo ""
+    echo "Studio is starting at: http://127.0.0.1:8443"
+    echo "Open it in your browser; the integrated terminal is already on the"
+    echo "lab network, so commands like 'ansible all -m ping' work directly."
+    echo "Stop it with: ./lab down"
     ;;
   ping)
     run_forge ansible all -i inventory/lab -m ansible.builtin.ping
@@ -264,6 +274,7 @@ Lab lifecycle:
   reset         Rebuild the lab from scratch
   status        Show container status
   logs          Show Docker Compose logs
+  studio        Start VS Code in the browser at http://127.0.0.1:8443
 
 Ansible:
   ping          Run ansible.builtin.ping against all managed hosts

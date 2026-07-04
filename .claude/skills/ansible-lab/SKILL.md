@@ -51,6 +51,12 @@ Any command starting with `ansible` is passed straight through to forge:
 the group graph, `./lab shell` opens bash in forge, `./lab exec <cmd>` runs
 anything else there.
 
+`./lab studio` starts an optional browser IDE (code-server) on
+http://127.0.0.1:8443: VS Code with the repo open, the Ansible extension,
+and a terminal on the lab network where `ansible`/`ansible-playbook` run
+directly with no wrapper. It is loopback-only with auth disabled; never
+publish the port more widely. `./lab down` stops it with everything else.
+
 PowerShell note: pass verbosity as `-vv` or `-vvv`, never bare `-v`
 (PowerShell steals it as the common `-Verbose` parameter).
 

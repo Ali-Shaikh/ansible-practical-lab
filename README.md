@@ -78,6 +78,31 @@ inventory file in each of `inventory/lab/` and `inventory/local/`, picking
 the next free SSH port from 2226 upwards. The `lab` wrappers and `doctor`
 pick the drop-ins up automatically, so no existing file needs editing.
 
+## Web Studio: Editor And Terminal In The Browser
+
+If you would rather not use a local editor or terminal, start the optional
+studio container:
+
+```bash
+./lab studio
+```
+
+Then open http://127.0.0.1:8443. You get VS Code in the browser with the
+repo already open, the Ansible extension installed, and an integrated
+terminal that lives on the lab network, so you can run Ansible directly:
+
+```bash
+ansible all -m ansible.builtin.ping
+ansible-playbook playbooks/10_baseline.yml
+ansible-lint playbooks/
+```
+
+The studio binds to `127.0.0.1` only and runs without a password; treat it
+like the rest of the lab and never expose the port beyond your machine.
+`./lab down` stops it along with everything else. Pin a different
+code-server release with `CODE_SERVER_VERSION=... docker compose --profile
+studio build studio`.
+
 ## Running Ansible From The Host
 
 The lab commands above run Ansible inside the short-lived `forge` container,

@@ -1,5 +1,5 @@
 ARG UBUNTU_VERSION=24.04
-FROM ubuntu:${UBUNTU_VERSION}
+FROM ubuntu:${UBUNTU_VERSION} AS control-node
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIPX_HOME=/opt/pipx
@@ -32,3 +32,21 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["bash"]
+
+# Studio: the control node plus code-server, giving a browser-based VS Code
+# with an integrated terminal where ansible commands run directly against
+# the lab hosts. Optional; only built for the `studio` compose profile.
+FROM control-node AS studio
+
+ARG CODE_SERVER_VERSION=4.127.0
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://code-server.dev/install.sh \
+       | sh -s -- --version "${CODE_SERVER_VERSION}" \
+    && code-server --install-extension redhat.ansible
+
+EXPOSE 8443
+
+CMD ["code-server", "--bind-addr", "0.0.0.0:8443", "--auth", "none", "--disable-telemetry", "/workspace"]

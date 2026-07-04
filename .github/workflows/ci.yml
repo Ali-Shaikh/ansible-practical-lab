@@ -67,5 +67,19 @@ jobs:
       - name: Remove the added host
         run: ./lab remove-host cypress
 
+      - name: Start the studio and check it serves
+        run: |
+          ./lab studio
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8443/healthz >/dev/null; then
+              echo "studio is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "studio did not become healthy in time"
+          docker logs apl-studio | tail -50
+          exit 1
+
       - name: Tear the lab down
         run: ./lab down

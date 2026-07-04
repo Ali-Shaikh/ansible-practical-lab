@@ -250,16 +250,26 @@ switch -Wildcard ($Command) {
         Invoke-Compose up -d --build
     }
     "down" {
-        Invoke-Compose down --remove-orphans
+        # --profile studio so the optional studio container is torn down too.
+        Invoke-Compose --profile studio down --remove-orphans
     }
     "reset" {
-        Invoke-Compose down --volumes --remove-orphans
+        Invoke-Compose --profile studio down --volumes --remove-orphans
         Initialize-LabKey
         Invoke-Compose build forge
         Invoke-Compose up -d --build
     }
     "status" {
-        Invoke-Compose ps
+        Invoke-Compose --profile studio ps
+    }
+    "studio" {
+        Initialize-LabKey
+        Invoke-Compose up -d --build studio
+        Write-Host ""
+        Write-Host "Studio is starting at: http://127.0.0.1:8443"
+        Write-Host "Open it in your browser; the integrated terminal is already on the"
+        Write-Host "lab network, so commands like 'ansible all -m ping' work directly."
+        Write-Host "Stop it with: .\lab.ps1 down"
     }
     "ping" {
         Invoke-Forge ansible all -i inventory/lab -m ansible.builtin.ping
@@ -318,6 +328,7 @@ Lab lifecycle:
   reset         Rebuild the lab from scratch
   status        Show container status
   logs          Show Docker Compose logs
+  studio        Start VS Code in the browser at http://127.0.0.1:8443
 
 Ansible:
   ping          Run ansible.builtin.ping against all managed hosts
