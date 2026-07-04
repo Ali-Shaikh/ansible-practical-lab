@@ -9,6 +9,10 @@ services:
         UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
         ANSIBLE_PACKAGE: ${ANSIBLE_PACKAGE:-ansible}
     hostname: forge
+    # forge is a short-lived tool container, not part of the running estate.
+    # The profile keeps `up` from starting it; `compose run forge` still works.
+    profiles:
+      - tools
     environment:
       ANSIBLE_CONFIG: /workspace/ansible.cfg
     working_dir: /workspace

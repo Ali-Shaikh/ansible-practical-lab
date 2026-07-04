@@ -7,6 +7,7 @@
 .lab
 .env
 .env.example
+compose.hosts
 docs
 tests
 README.md

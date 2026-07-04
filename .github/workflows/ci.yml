@@ -27,6 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pipx
           pipx install --include-deps ansible
+          pipx install ansible-lint
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install Galaxy collections
@@ -34,6 +35,37 @@ jobs:
 
       - name: Validate playbook syntax
         run: |
-          ansible-playbook -i inventory/lab.yml playbooks/00_ping.yml --syntax-check
-          ansible-playbook -i inventory/lab.yml playbooks/01_facts.yml --syntax-check
-          ansible-playbook -i inventory/lab.yml playbooks/10_baseline.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/00_ping.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/01_facts.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/10_baseline.yml --syntax-check
+
+      - name: Lint playbooks and inventories
+        run: ansible-lint
+
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Start the lab
+        run: ./lab up
+
+      - name: Ping all managed hosts
+        run: ./lab ping
+
+      - name: Run the baseline playbook
+        run: ./lab play playbooks/10_baseline.yml
+
+      - name: Add a host and reach it
+        run: |
+          ./lab add-host cypress web
+          ./lab up
+          ./lab ping
+
+      - name: Remove the added host
+        run: ./lab remove-host cypress
+
+      - name: Tear the lab down
+        run: ./lab down

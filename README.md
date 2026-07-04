@@ -46,21 +46,62 @@ The managed hosts are Ubuntu containers with SSH enabled. That is a lab shortcut
 ./lab reset
 ```
 
-## Running Ansible From The Host
+## Run Any Ansible Command
 
-The lab commands above run Ansible inside the short-lived `forge` container, using
-`inventory/lab.yml` (hosts addressed by their Docker network names).
-
-If you have the OpenSSH client and Ansible installed on your own machine, you can
-also drive the lab directly from the host using `inventory/local.yml`, which reaches
-the managed hosts over the published `127.0.0.1` ports:
+Every command that starts with `ansible` is passed straight through to the
+`forge` control node, with the repo mounted at `/workspace` and
+`inventory/lab` as the default inventory:
 
 ```bash
-ansible all -i inventory/local.yml -m ansible.builtin.ping
-ansible-playbook -i inventory/local.yml playbooks/01_facts.yml
+./lab ansible web -m ansible.builtin.command -a uptime
+./lab ansible-inventory --graph
+./lab ansible-vault encrypt group_vars/secret.yml
+./lab ansible-doc ansible.builtin.copy
+./lab ansible-galaxy collection list
+./lab lint                # ansible-lint over the repo
+```
+
+On Windows use `.\lab.ps1` the same way, and pass verbosity as `-vv` or
+`-vvv` rather than bare `-v` (PowerShell reserves `-v` for `-Verbose`).
+
+## Add More Hosts
+
+```bash
+./lab add-host titan            # plain linux host
+./lab add-host cypress web      # also joins the web group
+./lab up                        # build and start the new host
+./lab remove-host cypress       # stop it and delete its files
+```
+
+`add-host` creates one Docker Compose drop-in under `compose.hosts/` and one
+inventory file in each of `inventory/lab/` and `inventory/local/`, picking
+the next free SSH port from 2226 upwards. The `lab` wrappers and `doctor`
+pick the drop-ins up automatically, so no existing file needs editing.
+
+## Running Ansible From The Host
+
+The lab commands above run Ansible inside the short-lived `forge` container,
+using the `inventory/lab` directory (hosts addressed by their Docker network
+names).
+
+If you have the OpenSSH client and Ansible installed on your own machine
+(Linux, macOS, or WSL), you can also drive the lab directly from the host
+using `inventory/local`, which reaches the managed hosts over the published
+`127.0.0.1` ports:
+
+```bash
+ansible all -i inventory/local -m ansible.builtin.ping
+ansible-playbook -i inventory/local playbooks/01_facts.yml
 ```
 
 This path uses the host-side key at `.lab/ssh/id_ed25519`, so run it from the repo root.
+
+## Known Limits
+
+The managed hosts run sshd as their main process rather than systemd, so
+`ansible.builtin.service` and `ansible.builtin.systemd` tasks will fail.
+Practise packages, files, templates, users and cron instead. Everything else
+behaves like a normal SSH-managed Ubuntu server.
 
 ## Version Policy
 

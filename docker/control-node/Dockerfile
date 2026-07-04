@@ -17,7 +17,8 @@ RUN apt-get update \
        sshpass \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pipx install --include-deps "${ANSIBLE_PACKAGE}"
+RUN pipx install --include-deps "${ANSIBLE_PACKAGE}" \
+    && pipx install ansible-lint
 
 # Install the Galaxy collections declared for the lab so playbooks that use
 # them work out of the box. requirements.yml is the single source of truth.

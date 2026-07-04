@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
 missing=0
 
 need_command() {
@@ -27,12 +30,17 @@ fi
 
 docker compose version >/dev/null
 
-# Port clashes are the most common first-run failure. The lab publishes these
-# host ports in docker-compose.yml, so check they are free before `up`.
-# Skip the check when the lab is already running, since it legitimately holds
-# these ports itself.
-lab_ports=(2222 2223 2224 2225 8080)
+# Same compose file list as the ./lab wrapper: the base file plus one
+# drop-in per added host.
+compose_files=(-f docker-compose.yml)
+for host_file in compose.hosts/*.yml; do
+  [[ -e "$host_file" ]] && compose_files+=(-f "$host_file")
+done
 
+# Port clashes are the most common first-run failure. Read the published
+# ports from the resolved compose config so added hosts are covered too.
+# Skip the check when the lab is already running, since it legitimately
+# holds these ports itself.
 lab_running() {
   [[ -n "$(docker ps --filter 'name=apl-' --format '{{.Names}}' 2>/dev/null)" ]]
 }
@@ -43,11 +51,25 @@ port_in_use() {
 }
 
 if ! lab_running; then
+  # No mapfile here: macOS ships bash 3.2 by default.
+  lab_ports=()
+  while IFS= read -r published_port; do
+    lab_ports+=("$published_port")
+  done < <(
+    docker compose "${compose_files[@]}" config 2>/dev/null \
+      | sed -n 's/.*published: "\{0,1\}\([0-9]\{1,\}\)"\{0,1\}.*/\1/p' \
+      | sort -un
+  )
+  if [[ "${#lab_ports[@]}" -eq 0 ]]; then
+    # Fall back to the default lab ports if the compose config could not
+    # be parsed for any reason.
+    lab_ports=(2222 2223 2224 2225 8080)
+  fi
   ports_busy=0
   for port in "${lab_ports[@]}"; do
     if port_in_use "$port"; then
       echo "Port $port is already in use by another process."
-      echo "Free it or change the port mapping in docker-compose.yml, then run doctor again."
+      echo "Free it or change the port mapping, then run doctor again."
       ports_busy=1
     fi
   done

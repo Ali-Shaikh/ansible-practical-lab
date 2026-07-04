@@ -10,8 +10,24 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+if ($null -eq $Rest) {
+    $Rest = @()
+}
+
+# The lab estate is docker-compose.yml plus one drop-in file per added host
+# under compose.hosts/. Every compose call must see the same file list.
+$script:ComposeFiles = @("-f", "docker-compose.yml")
+Get-ChildItem -Path (Join-Path $PSScriptRoot "compose.hosts") -Filter "*.yml" -File -ErrorAction SilentlyContinue |
+    Sort-Object Name |
+    ForEach-Object { $script:ComposeFiles += @("-f", "compose.hosts/$($_.Name)") }
+
+$script:DefaultHosts = @("forge", "atlas", "beacon", "ledger", "vaultbox")
+# Default hosts, lab groups and Ansible keywords: a host with one of these
+# names would clash inside the merged inventory.
+$script:ReservedNames = $script:DefaultHosts + @("linux", "web", "database", "secrets", "all", "ungrouped", "localhost")
+
 function Invoke-Compose {
-    & docker compose @args
+    & docker compose @script:ComposeFiles @args
 }
 
 function Invoke-Forge {
@@ -39,7 +55,150 @@ function Initialize-LabKey {
     Copy-Item -Force $publicKeyFile $authorizedKeysFile
 }
 
-switch ($Command) {
+function Test-HostName {
+    param([string]$Name)
+    # -cnotmatch: -match is case-insensitive and would let 'Titan' through,
+    # which the case-sensitive bash wrapper then refuses to manage.
+    if ($Name -cnotmatch '^[a-z][a-z0-9-]*$') {
+        throw "Host name must start with a letter and use only lowercase letters, digits and dashes: $Name"
+    }
+    if ($script:ReservedNames -ccontains $Name) {
+        throw "Name '$Name' is reserved (default host, lab group, or Ansible keyword)."
+    }
+}
+
+function Get-NextFreeSshPort {
+    $usedPorts = @(2222, 2223, 2224, 2225)
+    Get-ChildItem -Path (Join-Path $PSScriptRoot "compose.hosts") -Filter "*.yml" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $match = Select-String -Path $_.FullName -Pattern '"(\d+):22"'
+        foreach ($m in $match) {
+            $usedPorts += [int]$m.Matches[0].Groups[1].Value
+        }
+    }
+    $port = 2226
+    while ($usedPorts -contains $port) {
+        $port++
+    }
+    return $port
+}
+
+function Add-LabHost {
+    param([string]$Name, [string]$Group)
+    if (-not $Name) {
+        throw "Usage: .\lab.ps1 add-host <name> [group]  (example: .\lab.ps1 add-host titan web)"
+    }
+    Test-HostName $Name
+    $composeFile = Join-Path $PSScriptRoot "compose.hosts\$Name.yml"
+    if (Test-Path $composeFile) {
+        throw "Host '$Name' already exists (compose.hosts/$Name.yml)."
+    }
+    if ($Group) {
+        if ($Group -cnotmatch '^[a-z][a-z0-9_]*$') {
+            throw "Group name must start with a letter and use only lowercase letters, digits and underscores: $Group"
+        }
+        # A group that shares a name with any host would clash in the inventory.
+        $groupClashes = @("all", "ungrouped", "localhost", $Name) + $script:DefaultHosts
+        if ($groupClashes -ccontains $Group) {
+            throw "Group name '$Group' clashes with a host name or Ansible keyword."
+        }
+        if (Test-Path (Join-Path $PSScriptRoot "compose.hosts\$Group.yml")) {
+            throw "Group name '$Group' clashes with the added host of the same name."
+        }
+    }
+    # Likewise, refuse a host name that matches a group created by an
+    # earlier add-host (groups sit at four-space indent in the drop-ins).
+    if (Select-String -Path (Join-Path $PSScriptRoot "inventory\lab\*.yml") -Pattern "^    ${Name}:" -CaseSensitive -Quiet -ErrorAction SilentlyContinue) {
+        throw "Host name '$Name' clashes with an existing inventory group."
+    }
+
+    $sshPort = Get-NextFreeSshPort
+
+    New-Item -ItemType Directory -Force -Path (Join-Path $PSScriptRoot "compose.hosts") | Out-Null
+
+    $composeContent = @"
+services:
+  ${Name}:
+    build:
+      context: ./docker/managed-host
+      args:
+        UBUNTU_VERSION: `${UBUNTU_VERSION:-24.04}
+        HOST_USER: `${LAB_USER:-learner}
+        HOST_PASSWORD: `${LAB_PASSWORD:-learner}
+    container_name: apl-$Name
+    hostname: $Name
+    ports:
+      - "${sshPort}:22"
+    volumes:
+      - ./.lab/ssh:/lab-ssh:ro
+    networks:
+      lab:
+        aliases:
+          - $Name
+"@
+
+    $groupBlock = ""
+    if ($Group) {
+        $groupBlock = @"
+
+    ${Group}:
+      hosts:
+        ${Name}:
+"@
+    }
+
+    $labInventory = @"
+---
+all:
+  children:
+    linux:
+      hosts:
+        ${Name}:
+          ansible_host: $Name$groupBlock
+"@
+
+    $localInventory = @"
+---
+all:
+  children:
+    linux:
+      hosts:
+        ${Name}:
+          ansible_host: 127.0.0.1
+          ansible_port: $sshPort$groupBlock
+"@
+
+    # Compose and inventory files are read inside Linux containers, so keep LF endings.
+    [System.IO.File]::WriteAllText($composeFile, ($composeContent -replace "`r`n", "`n") + "`n")
+    [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot "inventory\lab\$Name.yml"), ($labInventory -replace "`r`n", "`n") + "`n")
+    [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot "inventory\local\$Name.yml"), ($localInventory -replace "`r`n", "`n") + "`n")
+
+    $groupNote = if ($Group) { ", group: $Group" } else { "" }
+    Write-Host "Added host '$Name' (SSH on 127.0.0.1:$sshPort$groupNote)."
+    Write-Host "Files created:"
+    Write-Host "  compose.hosts/$Name.yml"
+    Write-Host "  inventory/lab/$Name.yml"
+    Write-Host "  inventory/local/$Name.yml"
+    Write-Host "Start it with: .\lab.ps1 up"
+}
+
+function Remove-LabHost {
+    param([string]$Name)
+    if (-not $Name) {
+        throw "Usage: .\lab.ps1 remove-host <name>"
+    }
+    Test-HostName $Name
+    $composeFile = Join-Path $PSScriptRoot "compose.hosts\$Name.yml"
+    if (-not (Test-Path $composeFile)) {
+        throw "Host '$Name' was not added with add-host (compose.hosts/$Name.yml not found)."
+    }
+    Invoke-Compose rm --stop --force $Name *> $null
+    Remove-Item -Force -ErrorAction SilentlyContinue $composeFile,
+        (Join-Path $PSScriptRoot "inventory\lab\$Name.yml"),
+        (Join-Path $PSScriptRoot "inventory\local\$Name.yml")
+    Write-Host "Removed host '$Name'."
+}
+
+switch -Wildcard ($Command) {
     "doctor" {
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
             throw "Git was not found in PATH."
@@ -56,21 +215,30 @@ switch ($Command) {
         }
         & docker compose version
 
-        # Port clashes are the most common first-run failure. The lab publishes
-        # these host ports in docker-compose.yml, so check they are free before
-        # `up`. Skip the check when the lab is already running, since it holds
-        # these ports itself.
-        $labPorts = 2222, 2223, 2224, 2225, 8080
+        # Port clashes are the most common first-run failure. Read the published
+        # ports from the resolved compose config so added hosts are covered too.
+        # Skip the check when the lab is already running, since it holds these
+        # ports itself.
         $labRunning = & docker ps --filter "name=apl-" --format "{{.Names}}"
         if (-not $labRunning) {
+            $config = Invoke-Compose config --format json | ConvertFrom-Json
+            $labPorts = @()
+            foreach ($service in $config.services.PSObject.Properties) {
+                $servicePorts = $service.Value.PSObject.Properties["ports"]
+                if ($servicePorts) {
+                    foreach ($portEntry in $servicePorts.Value) {
+                        $labPorts += [int]$portEntry.published
+                    }
+                }
+            }
             $busyPorts = @()
-            foreach ($port in $labPorts) {
+            foreach ($port in ($labPorts | Sort-Object -Unique)) {
                 if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) {
                     $busyPorts += $port
                 }
             }
             if ($busyPorts.Count -gt 0) {
-                throw "These lab ports are already in use by another process: $($busyPorts -join ', '). Free them or change the port mapping in docker-compose.yml, then run doctor again."
+                throw "These lab ports are already in use by another process: $($busyPorts -join ', '). Free them or change the port mapping, then run doctor again."
             }
         }
 
@@ -79,31 +247,52 @@ switch ($Command) {
     "up" {
         Initialize-LabKey
         Invoke-Compose build forge
-        Invoke-Compose up -d --build atlas beacon ledger vaultbox
+        Invoke-Compose up -d --build
     }
     "down" {
-        Invoke-Compose down
+        Invoke-Compose down --remove-orphans
     }
     "reset" {
         Invoke-Compose down --volumes --remove-orphans
         Initialize-LabKey
         Invoke-Compose build forge
-        Invoke-Compose up -d --build atlas beacon ledger vaultbox
+        Invoke-Compose up -d --build
     }
     "status" {
         Invoke-Compose ps
     }
     "ping" {
-        Invoke-Forge ansible all -i inventory/lab.yml -m ansible.builtin.ping
+        Invoke-Forge ansible all -i inventory/lab -m ansible.builtin.ping
     }
     "facts" {
-        Invoke-Forge ansible-playbook -i inventory/lab.yml playbooks/01_facts.yml
+        Invoke-Forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
     }
     "play" {
         if ($Rest.Count -lt 1) {
             throw "Usage: .\lab.ps1 play <playbook> [extra ansible-playbook args]"
         }
-        Invoke-Forge ansible-playbook -i inventory/lab.yml @Rest
+        Invoke-Forge ansible-playbook -i inventory/lab @Rest
+    }
+    "lint" {
+        Invoke-Forge ansible-lint @Rest
+    }
+    "inventory" {
+        Invoke-Forge ansible-inventory -i inventory/lab --graph @Rest
+    }
+    "add-host" {
+        $name = if ($Rest.Count -ge 1) { $Rest[0] } else { "" }
+        $group = if ($Rest.Count -ge 2) { $Rest[1] } else { "" }
+        Add-LabHost -Name $name -Group $group
+    }
+    "remove-host" {
+        $name = if ($Rest.Count -ge 1) { $Rest[0] } else { "" }
+        Remove-LabHost -Name $name
+    }
+    "exec" {
+        if ($Rest.Count -lt 1) {
+            throw "Usage: .\lab.ps1 exec <command> [args]"
+        }
+        Invoke-Forge @Rest
     }
     "shell" {
         Invoke-Forge bash
@@ -111,21 +300,43 @@ switch ($Command) {
     "logs" {
         Invoke-Compose logs @Rest
     }
+    "ansible*" {
+        # Pass any ansible CLI straight through to the control node, e.g.
+        #   .\lab.ps1 ansible web -m ansible.builtin.command -a uptime
+        #   .\lab.ps1 ansible-vault encrypt vars\secret.yml
+        #   .\lab.ps1 ansible-doc ansible.builtin.copy
+        Invoke-Forge $Command @Rest
+    }
     { $_ -in @("help", "-h", "--help") } {
         @"
 Usage: .\lab.ps1 <command>
 
-Commands:
-  doctor   Check local prerequisites
-  up       Build and start the lab
-  down     Stop and remove lab containers
-  reset    Rebuild the lab from scratch
-  status   Show container status
-  ping     Run ansible.builtin.ping against all managed hosts
-  facts    Gather a few useful facts from all managed hosts
-  play     Run a playbook through the control-node container
-  shell    Open a shell in the control-node container
-  logs     Show Docker Compose logs
+Lab lifecycle:
+  doctor        Check local prerequisites
+  up            Build and start the lab
+  down          Stop and remove lab containers
+  reset         Rebuild the lab from scratch
+  status        Show container status
+  logs          Show Docker Compose logs
+
+Ansible:
+  ping          Run ansible.builtin.ping against all managed hosts
+  facts         Gather a few useful facts from all managed hosts
+  play          Run a playbook, e.g. .\lab.ps1 play playbooks/10_baseline.yml
+  ansible...    Run any ansible CLI in the control node, e.g.
+                .\lab.ps1 ansible web -m ansible.builtin.command -a uptime
+                .\lab.ps1 ansible-vault encrypt vars\secret.yml
+                .\lab.ps1 ansible-galaxy collection list
+  lint          Run ansible-lint over the repo (or given paths)
+  inventory     Show the inventory as a group graph
+
+Hosts:
+  add-host      Add a managed host, e.g. .\lab.ps1 add-host titan web
+  remove-host   Remove a host created with add-host
+
+Other:
+  shell         Open a shell in the control-node container
+  exec          Run any command in the control-node container
 "@
     }
     default {
