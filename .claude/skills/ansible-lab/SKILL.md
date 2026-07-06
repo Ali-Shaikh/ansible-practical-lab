@@ -11,7 +11,9 @@ called `forge`, so nothing needs to be installed on the user's machine except
 Docker, Git and an OpenSSH client.
 
 Use `./lab <command>` (Linux, macOS, WSL) or `.\lab.ps1 <command>` (Windows
-PowerShell). Both wrappers behave identically. Always prefer the wrapper over
+PowerShell). Both wrappers behave identically. The repo also carries a
+`.devcontainer/` so it runs unchanged in GitHub Codespaces or VS Code Dev
+Containers via docker-in-docker; inside those, use `./lab` as normal. Always prefer the wrapper over
 raw `docker compose`, because it assembles the compose file list from
 `docker-compose.yml` plus the per-host drop-ins in `compose.hosts/`.
 

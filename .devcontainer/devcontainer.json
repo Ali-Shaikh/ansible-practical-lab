@@ -1,0 +1,28 @@
+// Zero-install path: open this repo in GitHub Codespaces (or VS Code Dev
+// Containers) and the whole lab runs inside the workspace container via
+// docker-in-docker. Nothing is needed on the local machine, not even Docker.
+{
+  "name": "Ansible Practical Lab",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.ansible"
+      ]
+    }
+  },
+  // beacon's web port; SSH ports stay internal to the workspace.
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "beacon web"
+    }
+  },
+  // Confirms git, docker, ssh-keygen and free ports as soon as the
+  // container is ready, so the first thing a learner sees is a green check.
+  // The loop rides out the docker-in-docker daemon still starting up.
+  "postCreateCommand": "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done; ./lab doctor"
+}

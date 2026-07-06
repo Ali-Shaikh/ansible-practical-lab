@@ -2,6 +2,22 @@
 
 This repo provides a small Docker based server estate for learning and testing Ansible commands, inventories and playbooks without renting servers or building virtual machines.
 
+## Zero-Install: GitHub Codespaces
+
+No Docker on your machine? Open the repo in a Codespace
+([codespaces.new/Ali-Shaikh/ansible-practical-lab](https://codespaces.new/Ali-Shaikh/ansible-practical-lab)),
+wait for the container to build, then run the normal commands in its
+terminal:
+
+```bash
+./lab up
+./lab ping
+```
+
+The devcontainer brings its own Docker engine, so the whole estate runs
+inside the Codespace. The same configuration works locally with the
+VS Code Dev Containers extension.
+
 ## Quick Start
 
 Linux, macOS, or Windows with WSL:
