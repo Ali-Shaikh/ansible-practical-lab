@@ -31,11 +31,24 @@ fi
 docker compose version >/dev/null
 
 # Same compose file list as the ./lab wrapper: the base file plus one
-# drop-in per added host.
+# drop-in per added host, plus the systemd override when LAB_INIT=systemd.
 compose_files=(-f docker-compose.yml)
 for host_file in compose.hosts/*.yml; do
   [[ -e "$host_file" ]] && compose_files+=(-f "$host_file")
 done
+
+LAB_INIT="${LAB_INIT:-sshd}"
+case "$LAB_INIT" in
+  sshd) ;;
+  systemd)
+    compose_files+=(-f compose.systemd.yml)
+    echo "Init mode: systemd (privileged containers; service/systemd tasks work)."
+    ;;
+  *)
+    echo "LAB_INIT must be 'sshd' (default) or 'systemd', not '$LAB_INIT'."
+    exit 1
+    ;;
+esac
 
 # Port clashes are the most common first-run failure. Read the published
 # ports from the resolved compose config so added hosts are covered too.

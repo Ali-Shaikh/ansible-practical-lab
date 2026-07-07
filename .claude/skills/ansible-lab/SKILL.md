@@ -91,9 +91,13 @@ inventory) and picks the next free SSH port from 2226. Do not hand-edit
 
 ## Constraints to remember
 
-- The managed hosts run sshd as PID 1, not systemd. `ansible.builtin.service`
-  / `systemd` tasks will fail. Practise packages, files, templates, users,
-  cron and similar instead, or start daemons with `ansible.builtin.command`.
+- By default the managed hosts run sshd as PID 1, not systemd, and
+  `ansible.builtin.service` / `systemd` tasks fail. For service work, start
+  the lab in systemd mode: `LAB_INIT=systemd ./lab up` (after a `down`).
+  The default hosts then boot systemd as PID 1 and service tasks behave as
+  on a full server; `playbooks/20_services.yml` demonstrates the pattern
+  and asserts on `ansible_facts.service_mgr` first. Hosts from `add-host`
+  stay sshd-only in both modes.
 - Containers are Ubuntu 24.04 with Python 3; `become` works via passwordless
   sudo for the `learner` user.
 - The learner/learner password is a lab-only convention; SSH password auth is

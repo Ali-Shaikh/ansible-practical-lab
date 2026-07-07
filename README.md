@@ -143,12 +143,35 @@ ansible-playbook -i inventory/local playbooks/01_facts.yml
 
 This path uses the host-side key at `.lab/ssh/id_ed25519`, so run it from the repo root.
 
-## Known Limits
+## Service Management: Two Init Modes
 
-The managed hosts run sshd as their main process rather than systemd, so
-`ansible.builtin.service` and `ansible.builtin.systemd` tasks will fail.
-Practise packages, files, templates, users and cron instead. Everything else
-behaves like a normal SSH-managed Ubuntu server.
+By default the managed hosts run sshd as their main process rather than
+systemd, so `ansible.builtin.service` and `ansible.builtin.systemd` tasks
+fail. Everything else behaves like a normal SSH-managed Ubuntu server, and
+the containers stay unprivileged.
+
+To practise services, handlers and restarts, start the lab in systemd mode
+instead:
+
+```bash
+./lab down
+LAB_INIT=systemd ./lab up
+./lab play playbooks/20_services.yml
+```
+
+```powershell
+.\lab.ps1 down
+$env:LAB_INIT = "systemd"; .\lab.ps1 up
+.\lab.ps1 play playbooks/20_services.yml
+```
+
+Each default host then boots a real systemd as PID 1 (the same pattern the
+Molecule test images use), so service tasks behave exactly as on a full
+server. The trade-off is weaker isolation: the containers run privileged
+with the host cgroup namespace, which is fine for a disposable lab bound to
+127.0.0.1 but not a pattern to copy for exposed services. Hosts created
+with `add-host` keep the sshd init in either mode. Use the same variable
+consistently for `up`, `down` and `reset`; run `down` before switching.
 
 ## Version Policy
 
