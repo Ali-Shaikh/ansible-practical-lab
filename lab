@@ -16,6 +16,20 @@ for host_file in compose.hosts/*.yml; do
   [[ -e "$host_file" ]] && COMPOSE_FILES+=(-f "$host_file")
 done
 
+# LAB_INIT=systemd boots the default hosts with systemd as PID 1 so that
+# service and systemd modules work; see compose.systemd.yml for the cost.
+LAB_INIT="${LAB_INIT:-sshd}"
+case "$LAB_INIT" in
+  sshd) ;;
+  systemd)
+    COMPOSE_FILES+=(-f compose.systemd.yml)
+    ;;
+  *)
+    echo "LAB_INIT must be 'sshd' (default) or 'systemd', not '$LAB_INIT'."
+    exit 2
+    ;;
+esac
+
 compose() {
   docker compose "${COMPOSE_FILES[@]}" "$@"
 }
@@ -294,6 +308,14 @@ Hosts:
 Other:
   shell         Open a shell in the control-node container
   exec          Run any command in the control-node container
+
+Environment:
+  LAB_INIT=systemd   Boot the default hosts with systemd as PID 1 so
+                     service/systemd tasks work, e.g.
+                       LAB_INIT=systemd ./lab up
+                     Switch modes with the same variable on 'up' after a
+                     'down'. Costs privileged containers; see
+                     compose.systemd.yml.
 HELP
     ;;
   *)

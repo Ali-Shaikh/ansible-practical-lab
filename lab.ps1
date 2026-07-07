@@ -21,6 +21,15 @@ Get-ChildItem -Path (Join-Path $PSScriptRoot "compose.hosts") -Filter "*.yml" -F
     Sort-Object Name |
     ForEach-Object { $script:ComposeFiles += @("-f", "compose.hosts/$($_.Name)") }
 
+# LAB_INIT=systemd boots the default hosts with systemd as PID 1 so that
+# service and systemd modules work; see compose.systemd.yml for the cost.
+$script:LabInit = if ($env:LAB_INIT) { $env:LAB_INIT } else { "sshd" }
+switch ($script:LabInit) {
+    "sshd" { }
+    "systemd" { $script:ComposeFiles += @("-f", "compose.systemd.yml") }
+    default { throw "LAB_INIT must be 'sshd' (default) or 'systemd', not '$($script:LabInit)'." }
+}
+
 $script:DefaultHosts = @("forge", "atlas", "beacon", "ledger", "vaultbox")
 # Default hosts, lab groups and Ansible keywords: a host with one of these
 # names would clash inside the merged inventory.
@@ -348,6 +357,14 @@ Hosts:
 Other:
   shell         Open a shell in the control-node container
   exec          Run any command in the control-node container
+
+Environment:
+  LAB_INIT=systemd   Boot the default hosts with systemd as PID 1 so
+                     service/systemd tasks work, e.g.
+                       `$env:LAB_INIT = "systemd"; .\lab.ps1 up
+                     Switch modes with the same variable on 'up' after a
+                     'down'. Costs privileged containers; see
+                     compose.systemd.yml.
 "@
     }
     default {

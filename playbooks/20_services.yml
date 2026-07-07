@@ -1,0 +1,48 @@
+---
+# Requires systemd mode: start the lab with
+#   LAB_INIT=systemd ./lab up        (bash)
+#   $env:LAB_INIT = "systemd"; .\lab.ps1 up   (PowerShell)
+# The first task explains this instead of failing half-way through.
+- name: Manage a service with a handler
+  hosts: web
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Confirm the host booted with systemd
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.service_mgr == "systemd"
+        fail_msg: >-
+          This host runs sshd as PID 1, so service management is not
+          available. Restart the lab in systemd mode:
+          down, then LAB_INIT=systemd ./lab up
+        success_msg: "systemd is PID 1; service tasks will work."
+
+    - name: Install the web server
+      ansible.builtin.apt:
+        name: "{{ web_service_name }}"
+        state: present
+        update_cache: true
+
+    - name: Serve a lab page
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          <h1>Served by {{ web_service_name }}, managed by Ansible.</h1>
+      notify: Restart the web server
+
+    - name: Ensure the web server is enabled and running
+      ansible.builtin.service:
+        name: "{{ web_service_name }}"
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart the web server
+      ansible.builtin.service:
+        name: "{{ web_service_name }}"
+        state: restarted
