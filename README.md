@@ -1,6 +1,12 @@
 # Ansible Practical Lab
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Ali-Shaikh/ansible-practical-lab)
+
 This repo provides a small Docker based server estate for learning and testing Ansible commands, inventories and playbooks without renting servers or building virtual machines.
+
+Guides, the quick start and the Practical Ansible article series live at
+[lab.cloudsprocket.org](https://lab.cloudsprocket.org). The lab is free and
+open source under the [MIT licence](LICENSE).
 
 ## Zero-Install: GitHub Codespaces
 
