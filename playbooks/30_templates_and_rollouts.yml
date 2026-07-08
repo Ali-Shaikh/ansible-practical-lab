@@ -1,7 +1,14 @@
 ---
-- name: Test roles
+- name: Apply common
   hosts: linux
   become: true
   gather_facts: true
   roles:
     - common
+
+- name: Apply web
+  hosts: web
+  become: true
+  gather_facts: true
+  roles:
+    - web

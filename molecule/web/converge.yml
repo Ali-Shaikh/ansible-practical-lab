@@ -3,5 +3,8 @@
   hosts: web
   become: true
   gather_facts: true
+  vars:
+    web_service_name: nginx
+    web_listen_port: 80
   roles:
     - web

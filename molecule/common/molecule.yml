@@ -38,6 +38,7 @@ provisioner:
     ANSIBLE_CONFIG: ansible.cfg
     ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     ANSIBLE_REMOTE_USER: learner
+    ANSIBLE_ROLES_PATH: /workspace/roles
   ansible_args:
     - "--private-key=/tmp/lab-ssh/id_ed25519"
     - "--ssh-common-args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"

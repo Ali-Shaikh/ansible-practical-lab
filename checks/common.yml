@@ -23,7 +23,7 @@
       ansible.builtin.command: cat /etc/motd
       register: m
       changed_when: false
-      failed_when: "'ansible-practical-lab' not in m.stdout"
+      failed_when: "'Practical Ansible lab' not in m.stdout"
 
     - name: Success
       ansible.builtin.debug:

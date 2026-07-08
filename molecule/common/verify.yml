@@ -8,16 +8,16 @@
       ansible.builtin.stat:
         path: /opt/ansible-lab
       register: dir_stat
-      failed_when: not dir_stat.stat.exists
+      failed_when: not (dir_stat.stat.isdir | default(false))
 
     - name: Check lab config file rendered
       ansible.builtin.stat:
         path: /etc/ansible-lab/config.yml
       register: config_stat
-      failed_when: not config_stat.stat.exists
+      failed_when: not (config_stat.stat.exists | default(false))
 
     - name: Assert MOTD contains lab marker
       ansible.builtin.command: cat /etc/motd
       register: motd
       changed_when: false
-      failed_when: "'ansible-practical-lab' not in motd.stdout"
+      failed_when: "'Practical Ansible lab' not in motd.stdout"
