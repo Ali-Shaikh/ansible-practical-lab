@@ -16,6 +16,9 @@ platforms:
     ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     ansible_python_interpreter: /usr/bin/python3
+    # Vars from group_vars/web.yml (root cause: Molecule inventory does not auto-load sibling group_vars like lab does)
+    web_service_name: nginx
+    web_listen_port: 80
     groups:
       - web
 provisioner:
@@ -24,15 +27,18 @@ provisioner:
     defaults:
       host_key_checking: false
       remote_user: learner
+      # Fix role path for scenario (Molecule runs from molecule/web/, roles are at ../../roles)
+      # Per official: https://docs.ansible.com/projects/ansible/latest/reference_appendices/config.html#default-roles-path
+      roles_path: ../../roles
   env:
     ANSIBLE_CONFIG: ansible.cfg
     ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     ANSIBLE_REMOTE_USER: learner
+    # Force roles path so Molecule finds ../../roles from scenario dir
+    ANSIBLE_ROLES_PATH: /workspace/roles
   ansible_args:
     - "--private-key=/tmp/lab-ssh/id_ed25519"
     - "--ssh-common-args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  inventory:
-    links: {}
   playbooks:
     converge: converge.yml
     verify: verify.yml
