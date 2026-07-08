@@ -1,0 +1,126 @@
+name: ansible-practical-lab
+
+services:
+  forge:
+    build:
+      context: .
+      dockerfile: docker/control-node/Dockerfile
+      target: control-node
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+        ANSIBLE_PACKAGE: ${ANSIBLE_PACKAGE:-ansible}
+    hostname: forge
+    # forge is a short-lived tool container, not part of the running estate.
+    # The profile keeps `up` from starting it; `compose run forge` still works.
+    profiles:
+      - tools
+    environment:
+      ANSIBLE_CONFIG: /workspace/ansible.cfg
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    networks:
+      - lab
+
+  studio:
+    build:
+      context: .
+      dockerfile: docker/control-node/Dockerfile
+      target: studio
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+        ANSIBLE_PACKAGE: ${ANSIBLE_PACKAGE:-ansible}
+        CODE_SERVER_VERSION: ${CODE_SERVER_VERSION:-4.127.0}
+    container_name: apl-studio
+    hostname: studio
+    # Optional browser IDE; started only via `lab studio`. Auth is disabled
+    # because the port is bound to loopback on a disposable lab. Do not
+    # publish this beyond 127.0.0.1.
+    profiles:
+      - studio
+    environment:
+      ANSIBLE_CONFIG: /workspace/ansible.cfg
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    ports:
+      - "127.0.0.1:8443:8443"
+    networks:
+      - lab
+
+  atlas:
+    build:
+      context: ./docker/managed-host
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+        HOST_USER: ${LAB_USER:-learner}
+        HOST_PASSWORD: ${LAB_PASSWORD:-learner}
+    container_name: apl-atlas
+    hostname: atlas
+    ports:
+      - "2222:22"
+    volumes:
+      - ./.lab/ssh:/lab-ssh:ro
+    networks:
+      lab:
+        aliases:
+          - atlas
+
+  beacon:
+    build:
+      context: ./docker/managed-host
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+        HOST_USER: ${LAB_USER:-learner}
+        HOST_PASSWORD: ${LAB_PASSWORD:-learner}
+    container_name: apl-beacon
+    hostname: beacon
+    ports:
+      - "2223:22"
+      - "8080:80"
+    volumes:
+      - ./.lab/ssh:/lab-ssh:ro
+    networks:
+      lab:
+        aliases:
+          - beacon
+
+  ledger:
+    build:
+      context: ./docker/managed-host
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+        HOST_USER: ${LAB_USER:-learner}
+        HOST_PASSWORD: ${LAB_PASSWORD:-learner}
+    container_name: apl-ledger
+    hostname: ledger
+    ports:
+      - "2224:22"
+    volumes:
+      - ./.lab/ssh:/lab-ssh:ro
+    networks:
+      lab:
+        aliases:
+          - ledger
+
+  vaultbox:
+    build:
+      context: ./docker/managed-host
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+        HOST_USER: ${LAB_USER:-learner}
+        HOST_PASSWORD: ${LAB_PASSWORD:-learner}
+    container_name: apl-vaultbox
+    hostname: vaultbox
+    ports:
+      - "2225:22"
+    volumes:
+      - ./.lab/ssh:/lab-ssh:ro
+    networks:
+      lab:
+        aliases:
+          - vaultbox
+
+networks:
+  lab:
+    name: ansible_practical_lab_net

@@ -1,0 +1,7 @@
+---
+# Shared connection settings for the in-container inventory.
+# The SSH private key path lives in hosts.yml because it differs from the
+# host-side inventory (inventory/local).
+ansible_user: learner
+ansible_python_interpreter: /usr/bin/python3
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
