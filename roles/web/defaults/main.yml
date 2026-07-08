@@ -1,0 +1,4 @@
+---
+# Defaults for web role (so it works in Molecule and other contexts without specific group_vars)
+web_service_name: nginx
+web_listen_port: 80
