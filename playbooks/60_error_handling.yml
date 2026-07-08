@@ -54,16 +54,17 @@
         msg: "This runs thanks to always in real blocks."
       tags: [always]
 
-  # Demonstrate block/rescue at play level too.
-  block:
-    - name: Risky step
-      ansible.builtin.debug:
-        msg: "Risky step succeeded in demo"
-  rescue:
-    - name: Handled error
-      ansible.builtin.debug:
-        msg: "Error was rescued at play level. See official block/rescue docs."
-  always:
-    - name: Always executed
-      ansible.builtin.debug:
-        msg: "Cleanup or notification always happens."
+  tasks:
+    - name: Demonstrate play-level like resilience with block inside tasks
+      block:
+        - name: Risky step
+          ansible.builtin.debug:
+            msg: "Risky step succeeded in demo"
+      rescue:
+        - name: Handled error
+          ansible.builtin.debug:
+            msg: "Error was rescued. See https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_blocks.html"
+      always:
+        - name: Always executed
+          ansible.builtin.debug:
+            msg: "Cleanup or notification always happens."

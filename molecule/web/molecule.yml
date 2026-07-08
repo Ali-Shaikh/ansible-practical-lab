@@ -2,7 +2,9 @@
 # Molecule scenario for the web role (delegated to lab beacon host).
 # ./lab molecule test -s web
 driver:
-  name: delegated
+  name: default
+  options:
+    managed: false  # Use pre-existing lab hosts (delegated pattern per official Molecule docs)
 platforms:
   - name: beacon
     groups:
@@ -11,9 +13,21 @@ provisioner:
   name: ansible
   config_options:
     defaults:
-      inventory: inventory/lab/hosts.yml
+      host_key_checking: false
   env:
     ANSIBLE_CONFIG: ansible.cfg
+    ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  inventory:
+    hosts:
+      beacon:
+        ansible_host: beacon
+        ansible_user: learner
+        ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    groups:
+      web:
+        hosts:
+          beacon: {}
   playbooks:
     converge: converge.yml
     verify: verify.yml
