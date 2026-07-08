@@ -1,0 +1,37 @@
+---
+- name: Install web server package
+  ansible.builtin.apt:
+    name: "{{ web_service_name }}"
+    state: present
+    update_cache: true
+
+- name: Deploy web content using template
+  ansible.builtin.template:
+    src: index.html.j2
+    dest: /var/www/html/index.html
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart web server
+
+- name: Deploy advanced nginx site configuration (template demo)
+  ansible.builtin.template:
+    src: nginx-lab-site.conf.j2
+    dest: /etc/nginx/sites-available/ansible-lab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload web server
+
+- name: Enable the site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/ansible-lab.conf
+    dest: /etc/nginx/sites-enabled/ansible-lab.conf
+    state: link
+  notify: Reload web server
+
+- name: Ensure web server is enabled and running
+  ansible.builtin.service:
+    name: "{{ web_service_name }}"
+    state: started
+    enabled: true

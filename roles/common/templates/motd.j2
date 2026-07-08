@@ -1,0 +1,7 @@
+Managed by Ansible (Practical Ansible lab)
+Environment: {{ lab_environment }}
+Contact: {{ lab_contact }}
+Last configured: {{ ansible_facts.date_time.iso8601 }}
+Hostname: {{ inventory_hostname }}
+Distribution: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+Python: {{ ansible_facts.python_version }}

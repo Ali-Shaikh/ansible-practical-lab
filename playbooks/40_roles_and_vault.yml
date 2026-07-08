@@ -1,0 +1,85 @@
+---
+# Article 7: Secrets, Roles and Production Readiness
+# Demonstrates:
+# - Using roles for reusable automation (common + web)
+# - Ansible Vault for secrets
+# - Production-minded patterns (tags, syntax check, idempotency, requirements)
+#
+# Prerequisites:
+#   ./lab up
+#   # Encrypt the example (one time or edit later):
+#   ./lab ansible-vault encrypt group_vars/secrets/vault_example.yml
+#   # Provide password when prompted. For CI/demo you can use --vault-password-file
+#
+# Run:
+#   ./lab play playbooks/40_roles_and_vault.yml
+#   ./lab ansible-vault view group_vars/secrets/vault_example.yml
+- name: Apply common baseline role across Linux hosts
+  hosts: linux
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+  tags: [common, baseline, roles]
+
+- name: Deploy web using web role (role composition)
+  hosts: web
+  become: true
+  gather_facts: true
+
+  roles:
+    - web
+  tags: [web, roles]
+
+- name: Demonstrate Ansible Vault secrets (target secrets group)
+  hosts: secrets
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../group_vars/secrets/vault_example.yml   # Will be vault encrypted
+
+  tasks:
+    - name: Show that vault variables are loaded (never log secrets in real life)
+      ansible.builtin.debug:
+        msg:
+          - "API key loaded (first 8 chars): {{ lab_api_key[:8] | default('N/A') }}..."
+          - "Note from vault: {{ lab_note }}"
+      no_log: false   # For demo only - in prod use no_log: true on secret tasks
+      tags: [vault, secrets, demo]
+
+    - name: Deploy a secrets-aware file using template + vault var
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../roles/common/templates/lab_config.yml.j2"
+        dest: /etc/ansible-lab/vault-demo.yml
+        owner: root
+        group: root
+        mode: "0600"
+      tags: [vault, template]
+
+    - name: Write a secret note file (example of handling secrets)
+      ansible.builtin.copy:
+        dest: /etc/ansible-lab/secret-note.txt
+        content: |
+          This is a demo secret from vault.
+          Key hint: {{ lab_api_key[:4] }}...
+          DB: {{ lab_db_password[:4] }}...
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      tags: [vault, secrets]
+
+- name: Production readiness checks
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Confirm all hosts are reachable
+      ansible.builtin.ping:
+      tags: [production, verify]
+
+    - name: Show role usage summary
+      ansible.builtin.debug:
+        msg: "Roles and vault demo complete. In real projects: use --syntax-check, CI, and separate vault passwords per environment."
+      tags: [production]

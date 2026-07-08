@@ -1,0 +1,14 @@
+---
+# Defaults for common role - override in group_vars or host_vars as needed
+common_managed_directories:
+  - /opt/ansible-lab
+  - /etc/ansible-lab
+
+common_packages:
+  - ca-certificates
+  - curl
+  - vim-tiny
+  - htop
+
+lab_environment: training
+lab_contact: "learner@example.com"

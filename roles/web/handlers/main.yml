@@ -1,0 +1,11 @@
+---
+- name: Restart web server
+  ansible.builtin.service:
+    name: "{{ web_service_name }}"
+    state: restarted
+
+- name: Reload web server
+  ansible.builtin.service:
+    name: "{{ web_service_name }}"
+    state: reloaded
+  listen: "Reload web server"  # allow multiple notifies to same handler

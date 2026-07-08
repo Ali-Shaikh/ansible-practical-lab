@@ -1,0 +1,38 @@
+---
+- name: Install common baseline packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - vim-tiny
+      - htop
+    state: present
+    update_cache: true
+
+- name: Create managed directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /opt/ansible-lab
+    - /etc/ansible-lab
+
+- name: Deploy base message of the day
+  ansible.builtin.template:
+    src: motd.j2
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update motd cache
+
+- name: Deploy lab configuration file (demonstrates template)
+  ansible.builtin.template:
+    src: lab_config.yml.j2
+    dest: /etc/ansible-lab/config.yml
+    owner: root
+    group: root
+    mode: "0644"

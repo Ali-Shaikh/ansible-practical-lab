@@ -1,0 +1,23 @@
+server {
+    listen {{ web_listen_port | default(80) }};
+    server_name _;
+
+    root /var/www/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    # Example of using a vaulted or group var in config
+    location /lab-info {
+        default_type application/json;
+        return 200 '{"host":"{{ inventory_hostname }}","env":"{{ lab_environment | default("lab") }}"}';
+    }
+}

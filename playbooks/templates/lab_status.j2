@@ -1,0 +1,8 @@
+---
+# Standalone template example (can be used outside roles)
+lab_status:
+  host: {{ inventory_hostname }}
+  groups: {{ group_names | join(', ') }}
+  timestamp: {{ ansible_facts.date_time.iso8601 | default('unknown') }}
+  message: "This config was rendered from a playbook-level template for Article 6."
+  serial_batch_note: "When using serial, this runs per batch."

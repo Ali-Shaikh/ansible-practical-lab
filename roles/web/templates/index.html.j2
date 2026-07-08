@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head>
+  <title>{{ inventory_hostname }} - {{ web_service_name | default('web') }} health</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    .status { color: #0a0; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>✅ Served by {{ web_service_name }} on {{ inventory_hostname }}</h1>
+  <p class="status">Service is healthy.</p>
+  <p>Environment: {{ lab_environment | default('training') }}</p>
+  <p>Generated at: {{ ansible_facts.date_time.iso8601 }}</p>
+  <hr>
+  <p><small>Managed by Ansible Practical Lab - role: web</small></p>
+</body>
+</html>

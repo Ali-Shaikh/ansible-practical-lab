@@ -1,0 +1,5 @@
+---
+- name: Update motd cache
+  ansible.builtin.command: run-parts /etc/update-motd.d || true
+  changed_when: false
+  check_mode: false
