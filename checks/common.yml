@@ -1,0 +1,30 @@
+---
+# Example self-check for pro modules / role work.
+# Learners can run: ./lab play checks/common.yml
+# It applies or verifies the common role effects.
+- name: Check common role effects
+  hosts: linux
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Verify /opt/ansible-lab exists (from common role)
+      ansible.builtin.stat:
+        path: /opt/ansible-lab
+      register: d
+      failed_when: not d.stat.isdir | default(false)
+
+    - name: Verify config file from template
+      ansible.builtin.stat:
+        path: /etc/ansible-lab/config.yml
+      register: c
+      failed_when: not c.stat.exists | default(false)
+
+    - name: Verify MOTD mentions lab
+      ansible.builtin.command: cat /etc/motd
+      register: m
+      changed_when: false
+      failed_when: "'ansible-practical-lab' not in m.stdout"
+
+    - name: Success
+      ansible.builtin.debug:
+        msg: "Common role check passed"

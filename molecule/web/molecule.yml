@@ -7,6 +7,9 @@ driver:
     managed: false  # Use pre-existing lab hosts (delegated pattern per official Molecule docs)
 platforms:
   - name: beacon
+    ansible_user: learner
+    ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     groups:
       - web
 provisioner:
@@ -17,17 +20,9 @@ provisioner:
   env:
     ANSIBLE_CONFIG: ansible.cfg
     ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  # Rely on lab inventory + platform connection details above for SSH
   inventory:
-    hosts:
-      beacon:
-        ansible_host: beacon
-        ansible_user: learner
-        ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
-        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    groups:
-      web:
-        hosts:
-          beacon: {}
+    links: {}
   playbooks:
     converge: converge.yml
     verify: verify.yml

@@ -182,6 +182,14 @@ The lab now ships reusable roles and more advanced playbooks matching the articl
 - `playbooks/30_templates_and_rollouts.yml` — Jinja2 templates, `serial`, validation, `changed_when`
 - `playbooks/40_roles_and_vault.yml` — role composition + Ansible Vault example
 
+Phase 3 expansions (see .local/PHASE3_EXPANSION_PLAN.md):
+- Molecule scenarios in `molecule/` for testing roles (delegated driver, see https://docs.ansible.com/projects/molecule/)
+- `playbooks/50_capstone.yml` and `60_error_handling.yml` (block/rescue, assert per official docs)
+- `checks/` self-verification playbooks for pro-style learning
+- `inventory/examples/` for dynamic inventory (community.docker plugin)
+- Lab `VERSION` + `./lab version` for compatibility
+- Official docs links throughout for no-assumption usage.
+
 Example:
 
 ```bash

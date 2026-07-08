@@ -16,7 +16,10 @@ driver:
     managed: false  # Use pre-existing lab hosts (delegated pattern per official Molecule docs)
 platforms:
   - name: atlas
-    # Delegated - Molecule will not manage; we provide connection via inventory above
+    # Connection details for delegated (fixes root@ / permission issues)
+    ansible_user: learner
+    ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     groups:
       - linux
 provisioner:
@@ -27,17 +30,9 @@ provisioner:
   env:
     ANSIBLE_CONFIG: ansible.cfg
     ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  # Rely on lab inventory + platform connection details above for SSH
   inventory:
-    hosts:
-      atlas:
-        ansible_host: atlas
-        ansible_user: learner
-        ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
-        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    groups:
-      linux:
-        hosts:
-          atlas: {}
+    links: {}  # empty to prefer generated + platform
   playbooks:
     converge: converge.yml
     verify: verify.yml
