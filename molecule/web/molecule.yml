@@ -15,6 +15,7 @@ platforms:
     ansible_user: learner
     ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    ansible_python_interpreter: /usr/bin/python3
     groups:
       - web
 provisioner:

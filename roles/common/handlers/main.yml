@@ -1,5 +1,6 @@
 ---
 - name: Update motd cache
-  ansible.builtin.command: run-parts /etc/update-motd.d || true
+  # Use shell to support || true (root cause fix from Molecule run error; command module does not interpret shell operators)
+  ansible.builtin.shell: run-parts /etc/update-motd.d || true
   changed_when: false
   check_mode: false
