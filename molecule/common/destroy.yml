@@ -1,0 +1,8 @@
+---
+- name: Destroy (no-op for delegated driver)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: No-op destroy
+      ansible.builtin.debug:
+        msg: "No-op destroy for delegated lab host"

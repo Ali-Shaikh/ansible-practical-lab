@@ -1,0 +1,8 @@
+---
+- name: Create (no-op for delegated driver using existing lab host)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: No-op create
+      ansible.builtin.debug:
+        msg: "Using pre-existing lab host 'beacon' via delegated driver"
