@@ -1,0 +1,8 @@
+---
+# Starter for error handling module
+- name: Starter error handling
+  hosts: linux
+  tasks:
+    - name: Example task
+      ansible.builtin.debug:
+        msg: "Replace with your tasks using block/rescue"

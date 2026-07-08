@@ -1,0 +1,22 @@
+---
+# .ansible-lint - configuration for quality
+# See official: https://ansible-lint.readthedocs.io/
+
+kinds:
+  - molecule: "molecule/*/molecule.yml"
+  - playbook: "checks/*.yml"
+
+# Enable rules for roles and playbooks
+enable_list:
+  - all
+
+# Skip some for lab/demo
+skip_list:
+  - yaml
+  - risky-shell-pipe
+  - no-changed-when  # demo files
+
+exclude_paths:
+  - molecule/  # handled separately
+  - .local/
+  - .github/

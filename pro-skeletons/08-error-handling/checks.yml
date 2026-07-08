@@ -1,0 +1,8 @@
+---
+# Self check for the module
+- name: Check error handling
+  hosts: linux
+  tasks:
+    - name: Verify some error handling was used
+      ansible.builtin.debug:
+        msg: "Implement your check here. Example: assert a task succeeded with rescue."

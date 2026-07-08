@@ -5,6 +5,11 @@ driver:
   name: default
   options:
     managed: false  # Use pre-existing lab hosts (delegated pattern per official Molecule docs)
+    ansible_connection_options:
+      ansible_connection: ssh
+      ansible_user: learner
+      ansible_ssh_private_key_file: /tmp/lab-ssh/id_ed25519
+      ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 platforms:
   - name: beacon
     ansible_user: learner
@@ -17,10 +22,14 @@ provisioner:
   config_options:
     defaults:
       host_key_checking: false
+      remote_user: learner
   env:
     ANSIBLE_CONFIG: ansible.cfg
     ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  # Rely on lab inventory + platform connection details above for SSH
+    ANSIBLE_REMOTE_USER: learner
+  ansible_args:
+    - "--private-key=/tmp/lab-ssh/id_ed25519"
+    - "--ssh-common-args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
   inventory:
     links: {}
   playbooks:
