@@ -1,0 +1,18 @@
+---
+- name: Verify web role
+  hosts: web
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Check web content
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        status_code: 200
+      register: result
+      failed_when: result.status != 200 or 'Served by' not in result.content
+
+    - name: Check nginx site config
+      ansible.builtin.stat:
+        path: /etc/nginx/sites-enabled/ansible-lab.conf
+      register: site
+      failed_when: not site.stat.exists

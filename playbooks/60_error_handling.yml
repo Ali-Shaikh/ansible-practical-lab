@@ -1,0 +1,69 @@
+---
+# Phase 3: Error Handling, Debugging and Resilience
+# Official patterns from Ansible docs:
+# - block / rescue / always
+# - assert
+# - failed_when, changed_when
+# - wait_for
+# - ignore_errors with care
+# Run with systemd if using services.
+- name: Error handling demo
+  hosts: linux
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Block with rescue for robust package install
+      block:
+        - name: Install a package that might fail
+          ansible.builtin.apt:
+            name: non-existent-package-demo
+            state: present
+      rescue:
+        - name: Fallback - install a safe package instead
+          ansible.builtin.apt:
+            name: curl
+            state: present
+          register: fallback
+        - name: Log the rescue
+          ansible.builtin.debug:
+            msg: "Rescued from package failure, used fallback"
+
+    - name: Use assert for preconditions (official assert module)
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == "Ubuntu"
+        fail_msg: "This demo expects Ubuntu (lab default). See https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/assert_module.html"
+
+    - name: Demonstrate wait_for (common resilience pattern)
+      ansible.builtin.wait_for:
+        port: 22
+        host: "{{ inventory_hostname }}"
+        timeout: 10
+      delegate_to: localhost
+      ignore_errors: true   # for demo; in prod use properly
+
+    - name: Task with explicit failed_when for command output
+      ansible.builtin.shell: echo "simulated check"; exit 0
+      register: check
+      failed_when: "'error' in check.stdout | lower"
+      changed_when: false
+
+    - name: Always run cleanup (even on failure)
+      ansible.builtin.debug:
+        msg: "This runs thanks to always in real blocks."
+      tags: [always]
+
+  # Demonstrate block/rescue at play level too.
+  block:
+    - name: Risky step
+      ansible.builtin.debug:
+        msg: "Risky step succeeded in demo"
+  rescue:
+    - name: Handled error
+      ansible.builtin.debug:
+        msg: "Error was rescued at play level. See official block/rescue docs."
+  always:
+    - name: Always executed
+      ansible.builtin.debug:
+        msg: "Cleanup or notification always happens."

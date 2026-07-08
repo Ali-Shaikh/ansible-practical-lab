@@ -255,6 +255,13 @@ case "$COMMAND" in
   lint)
     run_forge ansible-lint "$@"
     ;;
+  molecule)
+    # Run Molecule for role testing (delegated driver against lab hosts).
+    # Example: ./lab molecule test -s common
+    # Requires Molecule installed in forge (Phase 3 addition).
+    # See https://docs.ansible.com/projects/molecule/
+    run_forge molecule "$@"
+    ;;
   inventory)
     run_forge ansible-inventory -i inventory/lab --graph "$@"
     ;;
@@ -276,6 +283,13 @@ case "$COMMAND" in
     ;;
   logs)
     compose logs "$@"
+    ;;
+  version)
+    if [[ -f VERSION ]]; then
+      head -n1 VERSION
+    else
+      echo "unknown (no VERSION file)"
+    fi
     ;;
   help|-h|--help)
     cat <<'HELP'
@@ -299,6 +313,7 @@ Ansible:
                 ./lab ansible-vault encrypt vars/secret.yml
                 ./lab ansible-galaxy collection list
   lint          Run ansible-lint over the repo (or given paths)
+  molecule      Run Molecule for role testing (e.g. ./lab molecule test -s common)
   inventory     Show the inventory as a group graph
 
 Hosts:
@@ -308,6 +323,7 @@ Hosts:
 Other:
   shell         Open a shell in the control-node container
   exec          Run any command in the control-node container
+  version       Print the lab version (for pro content compatibility)
 
 Environment:
   LAB_INIT=systemd   Boot the default hosts with systemd as PID 1 so

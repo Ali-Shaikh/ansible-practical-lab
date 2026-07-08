@@ -1,0 +1,8 @@
+---
+- name: Converge - Apply common role
+  hosts: linux
+  gather_facts: true
+  become: true
+  roles:
+    - role: common
+      tags: [common]

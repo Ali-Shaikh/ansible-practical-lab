@@ -1,0 +1,29 @@
+---
+# Molecule scenario for the web role (delegated to lab beacon host).
+# ./lab molecule test -s web
+driver:
+  name: delegated
+platforms:
+  - name: beacon
+    groups:
+      - web
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      inventory: inventory/lab/hosts.yml
+  env:
+    ANSIBLE_CONFIG: ansible.cfg
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+verifier:
+  name: ansible
+scenario:
+  name: web
+  test_sequence:
+    - destroy
+    - create
+    - converge
+    - verify
+    - destroy

@@ -1,0 +1,20 @@
+---
+# Example dynamic inventory using official community.docker collection.
+# See: https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_dynamic_inventory.html
+# and https://docs.ansible.com/projects/ansible/latest/collections/community/docker/docker_containers_inventory.html
+#
+# Usage (after installing collection):
+#   ./lab ansible-inventory -i inventory/examples/docker_containers.yml --graph
+#
+# This would discover running containers in the lab network as hosts.
+# In real use, point at your Docker host or Swarm.
+plugin: community.docker.docker_containers
+docker_host: unix://var/run/docker.sock   # or tcp://...
+keyed_groups:
+  - prefix: docker_
+    key: labels.ansible_group | default('ungrouped')
+compose:
+  ansible_host: "{{ inventory_hostname }}"
+  # Map container name etc.
+# Note: For the lab, prefer the static inventory/lab for simplicity and speed.
+# This is for teaching dynamic patterns.

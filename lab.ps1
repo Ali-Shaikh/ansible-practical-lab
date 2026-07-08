@@ -224,6 +224,11 @@ switch -Wildcard ($Command) {
         }
         & docker compose version
 
+        if (Test-Path VERSION) {
+            $v = Get-Content VERSION | Select-Object -First 1
+            Write-Host "ansible-practical-lab version: $v (see VERSION file)"
+        }
+
         # Port clashes are the most common first-run failure. Read the published
         # ports from the resolved compose config so added hosts are covered too.
         # Skip the check when the lab is already running, since it holds these
@@ -295,6 +300,11 @@ switch -Wildcard ($Command) {
     "lint" {
         Invoke-Forge ansible-lint @Rest
     }
+    "molecule" {
+        # Molecule for role testing using delegated driver on lab hosts.
+        # ./lab.ps1 molecule test -s common
+        Invoke-Forge molecule @Rest
+    }
     "inventory" {
         Invoke-Forge ansible-inventory -i inventory/lab --graph @Rest
     }
@@ -318,6 +328,13 @@ switch -Wildcard ($Command) {
     }
     "logs" {
         Invoke-Compose logs @Rest
+    }
+    "version" {
+        if (Test-Path VERSION) {
+            Get-Content VERSION | Select-Object -First 1
+        } else {
+            "unknown (no VERSION file)"
+        }
     }
     "ansible*" {
         # Pass any ansible CLI straight through to the control node, e.g.
@@ -348,6 +365,7 @@ Ansible:
                 .\lab.ps1 ansible-vault encrypt vars\secret.yml
                 .\lab.ps1 ansible-galaxy collection list
   lint          Run ansible-lint over the repo (or given paths)
+  molecule      Run Molecule for role testing (e.g. .\lab.ps1 molecule test -s common)
   inventory     Show the inventory as a group graph
 
 Hosts:
@@ -357,6 +375,7 @@ Hosts:
 Other:
   shell         Open a shell in the control-node container
   exec          Run any command in the control-node container
+  version       Print the lab version (for pro content compatibility)
 
 Environment:
   LAB_INIT=systemd   Boot the default hosts with systemd as PID 1 so

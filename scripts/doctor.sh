@@ -30,6 +30,11 @@ fi
 
 docker compose version >/dev/null
 
+if [[ -f VERSION ]]; then
+  LAB_VERSION=$(head -n1 VERSION | tr -d '[:space:]')
+  echo "ansible-practical-lab version: $LAB_VERSION (see VERSION file and official compatibility notes)"
+fi
+
 # Same compose file list as the ./lab wrapper: the base file plus one
 # drop-in per added host, plus the systemd override when LAB_INIT=systemd.
 compose_files=(-f docker-compose.yml)

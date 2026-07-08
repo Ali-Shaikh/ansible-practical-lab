@@ -1,0 +1,41 @@
+---
+# Molecule scenario for testing the common role using the lab's existing hosts (delegated driver).
+# Run from the lab control node (forge):
+#   ./lab molecule test -s common
+#
+# Prerequisites:
+#   LAB_INIT=systemd ./lab up   (recommended for full role coverage)
+#   ./lab up
+#
+# See official docs:
+# https://docs.ansible.com/projects/molecule/
+# https://docs.ansible.com/projects/molecule/configuration/
+driver:
+  name: delegated
+platforms:
+  - name: atlas
+    groups:
+      - linux
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      inventory: inventory/lab/hosts.yml
+      host_key_checking: false
+  env:
+    ANSIBLE_CONFIG: ansible.cfg
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+verifier:
+  name: ansible
+scenario:
+  name: common
+  test_sequence:
+    - destroy
+    - create
+    - converge
+    - verify
+    - destroy
+# Note: create/destroy are no-op because we use the pre-existing lab hosts via delegated.
+# The lab provides the SSH and inventory.

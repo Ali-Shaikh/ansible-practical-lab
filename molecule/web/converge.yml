@@ -1,0 +1,7 @@
+---
+- name: Converge web role
+  hosts: web
+  become: true
+  gather_facts: true
+  roles:
+    - web

@@ -2,3 +2,6 @@
 collections:
   - name: ansible.posix
   - name: community.general
+  # For dynamic inventory examples (Phase 3)
+  - name: community.docker
+    version: ">=3.0.0"

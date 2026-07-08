@@ -18,7 +18,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pipx install --include-deps "${ANSIBLE_PACKAGE}" \
-    && pipx install ansible-lint
+    && pipx install ansible-lint \
+    && pipx install molecule  # For role testing (Phase 3). Uses delegated driver with lab hosts. See official docs: https://docs.ansible.com/projects/molecule/
 
 # Install the Galaxy collections declared for the lab so playbooks that use
 # them work out of the box. requirements.yml is the single source of truth.
