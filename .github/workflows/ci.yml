@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate shell scripts
         run: |
@@ -38,6 +38,12 @@ jobs:
           ansible-playbook -i inventory/lab playbooks/00_ping.yml --syntax-check
           ansible-playbook -i inventory/lab playbooks/01_facts.yml --syntax-check
           ansible-playbook -i inventory/lab playbooks/10_baseline.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/20_users_and_ssh.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/21_services_systemd.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/30_web_service.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/40_templates_and_handlers.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/60_secrets.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/70_web_role.yml --syntax-check
 
       - name: Lint playbooks and inventories
         run: ansible-lint
@@ -47,7 +53,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Start the lab
         run: ./lab up
@@ -55,8 +61,35 @@ jobs:
       - name: Ping all managed hosts
         run: ./lab ping
 
-      - name: Run the baseline playbook
-        run: ./lab play playbooks/10_baseline.yml
+      - name: Run starter and series playbooks with enforced idempotency
+        run: |
+          set -euo pipefail
+          # Second pass must report changed=0 on every host. Immediate re-runs
+          # also avoid cross-playbook file thrash (30 vs 40/70 health pages).
+          assert_idempotent() {
+            local playbook="$1"
+            shift
+            local out
+            # Capture and show output; fail if ansible fails.
+            out="$(./lab play "$playbook" "$@" 2>&1 | tee /dev/stderr)" || return 1
+            # PLAY RECAP host lines look like:
+            #   beacon  : ok=5  changed=0  unreachable=0  failed=0 ...
+            if printf '%s\n' "$out" | grep -E 'changed=[1-9][0-9]*' | grep -E 'ok=' >/dev/null; then
+              echo "Idempotency failure: $playbook reported non-zero changed on re-run" >&2
+              return 1
+            fi
+          }
+          run_twice() {
+            local playbook="$1"
+            shift
+            ./lab play "$playbook" "$@"
+            assert_idempotent "$playbook" "$@"
+          }
+          run_twice playbooks/10_baseline.yml
+          run_twice playbooks/20_users_and_ssh.yml
+          run_twice playbooks/30_web_service.yml
+          run_twice playbooks/40_templates_and_handlers.yml
+          run_twice playbooks/70_web_role.yml
 
       - name: Add a host and reach it
         run: |
@@ -80,6 +113,35 @@ jobs:
           echo "studio did not become healthy in time"
           docker logs apl-studio | tail -50
           exit 1
+
+      # Vault last: once secrets/vault.yml is encrypted, every inventory load
+      # needs a vault password (including ping). Clean up afterwards.
+      - name: Run vaulted secrets playbook
+        run: |
+          set -euo pipefail
+          cp inventory/lab/group_vars/secrets/vault.yml.example \
+            inventory/lab/group_vars/secrets/vault.yml
+          # Executable vault-password *script* (echoes the password). On some
+          # bind mounts (Docker Desktop on Windows) plain password files appear
+          # +x and Ansible then tries to execute them.
+          printf '%s\n' '#!/bin/sh' 'echo ci-smoke-vault-pass' > .vault_pass
+          chmod +x .vault_pass
+          ./lab ansible-vault encrypt \
+            inventory/lab/group_vars/secrets/vault.yml \
+            --vault-password-file .vault_pass
+          # Without a vault password this must fail (no plaintext auto-load).
+          if ./lab play playbooks/60_secrets.yml; then
+            echo "playbook 60 unexpectedly succeeded without a vault password" >&2
+            exit 1
+          fi
+          ./lab play playbooks/60_secrets.yml --vault-password-file .vault_pass
+          out="$(./lab play playbooks/60_secrets.yml --vault-password-file .vault_pass 2>&1 | tee /dev/stderr)" || exit 1
+          if printf '%s\n' "$out" | grep -E 'changed=[1-9][0-9]*' | grep -E 'ok=' >/dev/null; then
+            echo "Idempotency failure: playbooks/60_secrets.yml reported non-zero changed on re-run" >&2
+            exit 1
+          fi
+          # Drop encrypted vault so a re-run of later jobs is not blocked.
+          rm -f inventory/lab/group_vars/secrets/vault.yml .vault_pass
 
       - name: Tear the lab down
         run: ./lab down

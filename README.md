@@ -143,35 +143,60 @@ ansible-playbook -i inventory/local playbooks/01_facts.yml
 
 This path uses the host-side key at `.lab/ssh/id_ed25519`, so run it from the repo root.
 
+## Article-Aligned Playbooks
+
+Starter and series playbooks ship with the lab so the free articles run
+against real files:
+
+| Playbook | Purpose |
+| --- | --- |
+| `playbooks/00_ping.yml` | Reachability |
+| `playbooks/01_facts.yml` | Fact gathering (`./lab facts`) |
+| `playbooks/10_baseline.yml` | Small Linux baseline |
+| `playbooks/20_users_and_ssh.yml` | Users, keys and sudo (article 4) |
+| `playbooks/30_web_service.yml` | nginx + handlers (article 5) |
+| `playbooks/40_templates_and_handlers.yml` | Templates, validate, serial, flush before verify (article 6) |
+| `playbooks/60_secrets.yml` | Vault-backed secret deploy (article 7) |
+| `playbooks/70_web_role.yml` | Apply `roles/web` (article 7 refactor) |
+| `playbooks/21_services_systemd.yml` | Optional systemd-mode service demo |
+
+Group vars for article 4 live in `inventory/*/group_vars/linux.yml`. For
+article 7, copy `inventory/lab/group_vars/secrets/vault.yml.example` to
+`vault.yml` in the same directory, encrypt it, then run
+`./lab play playbooks/60_secrets.yml --ask-vault-pass`. The example uses a
+`.example` suffix so Ansible does not auto-load a plaintext demo password.
+
 ## Service Management: Two Init Modes
 
-By default the managed hosts run sshd as their main process rather than
-systemd, so `ansible.builtin.service` and `ansible.builtin.systemd` tasks
-fail. Everything else behaves like a normal SSH-managed Ubuntu server, and
-the containers stay unprivileged.
-
-To practise services, handlers and restarts, start the lab in systemd mode
-instead:
+By default the managed hosts run sshd as PID 1 (unprivileged containers).
+Many packages still ship classic init scripts, so `ansible.builtin.service`
+for nginx (article 5) works via that fallback. Tasks that need a real
+systemd (`ansible.builtin.systemd`, full unit control) need systemd mode:
 
 ```bash
 ./lab down
 LAB_INIT=systemd ./lab up
-./lab play playbooks/20_services.yml
+./lab play playbooks/21_services_systemd.yml
 ```
 
 ```powershell
 .\lab.ps1 down
 $env:LAB_INIT = "systemd"; .\lab.ps1 up
-.\lab.ps1 play playbooks/20_services.yml
+.\lab.ps1 play playbooks/21_services_systemd.yml
 ```
 
-Each default host then boots a real systemd as PID 1 (the same pattern the
-Molecule test images use), so service tasks behave exactly as on a full
-server. The trade-off is weaker isolation: the containers run privileged
-with the host cgroup namespace, which is fine for a disposable lab bound to
-127.0.0.1 but not a pattern to copy for exposed services. Hosts created
-with `add-host` keep the sshd init in either mode. Use the same variable
-consistently for `up`, `down` and `reset`; run `down` before switching.
+Each default host then boots systemd as PID 1 (the Molecule/geerlingguy
+pattern). The trade-off is weaker isolation: privileged containers and the
+host cgroup namespace. Fine for a disposable lab bound to 127.0.0.1; do not
+copy that pattern for exposed services. Hosts created with `add-host` keep
+sshd init in either mode. Use the same `LAB_INIT` for `up`, `down` and
+`reset`; run `down` before switching.
+
+## Lab Version
+
+The repo root `VERSION` file is the lab compatibility pin for pro content.
+Print it with `./lab version` (or `.\lab.ps1 version`). Doctor also reports
+it when the file is present.
 
 ## Version Policy
 

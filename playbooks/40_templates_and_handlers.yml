@@ -1,0 +1,54 @@
+---
+# Article 6: Jinja2 templates, validate-before-reload, serial rollout.
+#
+# Handlers normally wait until the end of the play. When a later task must
+# observe post-reload state (here the URI check), call meta: flush_handlers
+# first so validate + reload run before verification.
+- name: Roll out templated web configuration safely
+  hosts: web
+  become: true
+  gather_facts: true
+  serial: 1
+
+  vars:
+    web_root: /var/www/html
+
+  tasks:
+    - name: Render the nginx site configuration
+      ansible.builtin.template:
+        src: templates/nginx_default_site.conf.j2
+        dest: /etc/nginx/sites-available/default
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - Validate nginx configuration
+        - Reload nginx
+
+    - name: Render the health page
+      ansible.builtin.template:
+        src: templates/health.html.j2
+        dest: "{{ web_root }}/health.html"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Apply pending nginx handlers before verification
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify the service still answers
+      ansible.builtin.uri:
+        url: http://127.0.0.1/health.html
+        status_code: 200
+      become: false
+
+  handlers:
+    - name: Validate nginx configuration
+      ansible.builtin.command:
+        cmd: nginx -t
+      changed_when: false
+
+    - name: Reload nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded

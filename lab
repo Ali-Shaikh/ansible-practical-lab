@@ -238,6 +238,13 @@ case "$COMMAND" in
   facts)
     run_forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
     ;;
+  version)
+    if [[ -f VERSION ]]; then
+      head -n1 VERSION
+    else
+      echo "unknown (no VERSION file)"
+    fi
+    ;;
   play)
     if [[ $# -lt 1 ]]; then
       echo "Usage: ./lab play <playbook> [extra ansible-playbook args]"
@@ -283,6 +290,7 @@ Usage: ./lab <command>
 
 Lab lifecycle:
   doctor        Check local prerequisites
+  version       Print the lab version (for pro content compatibility)
   up            Build and start the lab
   down          Stop and remove lab containers
   reset         Rebuild the lab from scratch

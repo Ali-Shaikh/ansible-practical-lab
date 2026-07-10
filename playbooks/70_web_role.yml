@@ -1,0 +1,8 @@
+---
+# Article 7: apply the reusable web role (same behaviour as playbooks 30/40).
+- name: Configure the web tier
+  hosts: web
+  become: true
+  gather_facts: true
+  roles:
+    - web

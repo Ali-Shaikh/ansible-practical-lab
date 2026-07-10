@@ -1,0 +1,42 @@
+---
+- name: Install the web server package
+  ansible.builtin.apt:
+    name: "{{ web_service_name }}"
+    state: present
+    update_cache: true
+
+- name: Ensure the web server is running
+  ansible.builtin.service:
+    name: "{{ web_service_name }}"
+    state: started
+    enabled: true
+
+- name: Render the nginx site configuration
+  ansible.builtin.template:
+    src: nginx_default_site.conf.j2
+    dest: /etc/nginx/sites-available/default
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Validate nginx configuration
+    - Reload nginx
+
+- name: Render the health page
+  ansible.builtin.template:
+    src: health.html.j2
+    dest: "{{ web_root }}/health.html"
+    owner: root
+    group: root
+    mode: "0644"
+
+# Handlers (validate + reload) must run before the URI check so we verify
+# the post-reload config, not the previous nginx process state.
+- name: Apply pending nginx handlers before verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify the service answers locally
+  ansible.builtin.uri:
+    url: http://127.0.0.1/health.html
+    status_code: 200
+  become: false

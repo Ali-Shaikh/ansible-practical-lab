@@ -1,0 +1,39 @@
+---
+# Article 4: manage users, SSH keys and sudo as data-driven access control.
+- name: Manage users, SSH keys and sudo access
+  hosts: linux
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Ensure user accounts match the access list
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        comment: "{{ item.comment | default('') }}"
+        groups: "{{ item.groups | default([]) }}"
+        append: false
+        shell: /bin/bash
+        state: "{{ item.state }}"
+        remove: "{{ item.state == 'absent' }}"
+      loop: "{{ managed_users }}"
+      tags: [users]
+
+    - name: Install SSH public keys for present users
+      ansible.posix.authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ lookup('ansible.builtin.file', managed_users_key_file) }}"
+        state: present
+      loop: "{{ managed_users | selectattr('state', 'eq', 'present') | list }}"
+      tags: [users, ssh]
+
+    - name: Manage the team sudo drop-in
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/50-managed-users
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+        content: |
+          # Managed by Ansible. Do not edit by hand.
+          alice ALL=(ALL) NOPASSWD:ALL
+      tags: [sudo]

@@ -10,3 +10,6 @@ __pycache__/
 Thumbs.db
 .idea/
 .local/
+.vault_pass
+# Encrypted vault files learners create from vault.yml.example
+inventory/**/group_vars/**/vault.yml
