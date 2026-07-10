@@ -50,6 +50,8 @@ jobs:
 
   smoke:
     runs-on: ubuntu-latest
+    # Skip the expensive Docker estate when syntax/lint already failed.
+    needs: [validate]
 
     steps:
       - name: Check out code

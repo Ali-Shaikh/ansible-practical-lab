@@ -1,7 +1,7 @@
 ---
 - name: Validate nginx configuration
   ansible.builtin.command:
-    cmd: nginx -t
+    cmd: "{{ web_config_test_cmd }}"
   changed_when: false
 
 - name: Reload nginx
