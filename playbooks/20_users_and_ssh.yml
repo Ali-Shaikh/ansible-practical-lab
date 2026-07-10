@@ -35,5 +35,9 @@
         validate: /usr/sbin/visudo -cf %s
         content: |
           # Managed by Ansible. Do not edit by hand.
-          alice ALL=(ALL) NOPASSWD:ALL
+          {% for user in managed_users
+             if user.state | default('present') == 'present'
+             and 'sudo' in (user.groups | default([])) %}
+          {{ user.name }} ALL=(ALL) NOPASSWD:ALL
+          {% endfor %}
       tags: [sudo]

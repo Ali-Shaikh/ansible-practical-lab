@@ -119,6 +119,11 @@ jobs:
       - name: Run vaulted secrets playbook
         run: |
           set -euo pipefail
+          cleanup_vault() {
+            rm -f inventory/lab/group_vars/secrets/vault.yml .vault_pass
+          }
+          # Always drop encrypted vault material, even if a later assertion fails.
+          trap cleanup_vault EXIT
           cp inventory/lab/group_vars/secrets/vault.yml.example \
             inventory/lab/group_vars/secrets/vault.yml
           # Executable vault-password *script* (echoes the password). On some
@@ -140,8 +145,6 @@ jobs:
             echo "Idempotency failure: playbooks/60_secrets.yml reported non-zero changed on re-run" >&2
             exit 1
           fi
-          # Drop encrypted vault so a re-run of later jobs is not blocked.
-          rm -f inventory/lab/group_vars/secrets/vault.yml .vault_pass
 
       - name: Tear the lab down
         run: ./lab down
