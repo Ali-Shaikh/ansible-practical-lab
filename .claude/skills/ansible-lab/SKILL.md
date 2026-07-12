@@ -95,8 +95,8 @@ inventory) and picks the next free SSH port from 2226. Do not hand-edit
   `ansible.builtin.service` / `systemd` tasks fail. For service work, start
   the lab in systemd mode: `LAB_INIT=systemd ./lab up` (after a `down`).
   The default hosts then boot systemd as PID 1 and service tasks behave as
-  on a full server; `playbooks/20_services.yml` demonstrates the pattern
-  and asserts on `ansible_facts.service_mgr` first. Hosts from `add-host`
+  on a full server; `playbooks/21_services_systemd.yml` demonstrates the
+  pattern and asserts on `ansible_facts.service_mgr` first. Hosts from `add-host`
   stay sshd-only in both modes.
 - Containers are Ubuntu 24.04 with Python 3; `become` works via passwordless
   sudo for the `learner` user.

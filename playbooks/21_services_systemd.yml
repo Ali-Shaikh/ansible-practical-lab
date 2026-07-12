@@ -33,6 +33,11 @@
         mode: "0644"
         content: |
           <h1>Served by {{ web_service_name }}, managed by Ansible.</h1>
+          <p>
+            <small>
+              Built by <a href="https://alishaikh.me/" rel="author">Ali Shaikh</a>.
+            </small>
+          </p>
       notify: Restart the web server
 
     - name: Ensure the web server is enabled and running

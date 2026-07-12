@@ -30,7 +30,7 @@ The control node is built as an on-demand container. It is not kept running afte
 
 Managed hosts use SSH keys by default. The wrapper creates a lab-specific Ed25519 key pair under `.lab/ssh`, mounts the public key into each managed host, and points Ansible at the private key.
 
-On Windows, bind-mounted files can appear too permissive inside Linux containers. The control-node entrypoint copies the private key to `/tmp/lab-ssh/id_ed25519` with `0600` permissions before running Ansible.
+On Windows, bind-mounted files can appear too permissive inside Linux containers. The control-node entrypoint copies the private key to `/tmp/lab-ssh/id_ed25519` with `0600` permissions before running Ansible, and copies the matching public key to `/tmp/lab-ssh/id_ed25519.pub` for playbooks that install authorized keys from the lab key.
 
 The lab images still set a `learner` password for the local Linux account, but normal Ansible commands use the private key.
 

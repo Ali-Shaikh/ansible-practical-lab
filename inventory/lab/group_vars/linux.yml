@@ -1,0 +1,15 @@
+---
+# Article 4: access list for the linux group (lab inventory / forge).
+managed_users:
+  - name: alice
+    comment: "Alice Example, platform team"
+    groups: [sudo]
+    state: present
+
+  - name: bob
+    comment: "Bob Example, app team"
+    groups: []
+    state: present
+
+# Lab key path inside the forge control-node container.
+managed_users_key_file: /tmp/lab-ssh/id_ed25519.pub

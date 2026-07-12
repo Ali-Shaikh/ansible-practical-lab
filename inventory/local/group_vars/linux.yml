@@ -1,0 +1,15 @@
+---
+# Article 4: access list for the linux group (host-side inventory).
+managed_users:
+  - name: alice
+    comment: "Alice Example, platform team"
+    groups: [sudo]
+    state: present
+
+  - name: bob
+    comment: "Bob Example, app team"
+    groups: []
+    state: present
+
+# Lab key path on the host when using inventory/local from the repo root.
+managed_users_key_file: .lab/ssh/id_ed25519.pub

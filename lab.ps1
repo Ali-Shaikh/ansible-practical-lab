@@ -224,6 +224,11 @@ switch -Wildcard ($Command) {
         }
         & docker compose version
 
+        if (Test-Path -LiteralPath "VERSION") {
+            $labVersion = (Get-Content -LiteralPath "VERSION" -TotalCount 1).Trim()
+            Write-Host "ansible-practical-lab version: $labVersion"
+        }
+
         # Port clashes are the most common first-run failure. Read the published
         # ports from the resolved compose config so added hosts are covered too.
         # Skip the check when the lab is already running, since it holds these
@@ -286,6 +291,14 @@ switch -Wildcard ($Command) {
     "facts" {
         Invoke-Forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
     }
+    "version" {
+        if (Test-Path -LiteralPath "VERSION") {
+            (Get-Content -LiteralPath "VERSION" -TotalCount 1).Trim()
+        }
+        else {
+            Write-Output "unknown (no VERSION file)"
+        }
+    }
     "play" {
         if ($Rest.Count -lt 1) {
             throw "Usage: .\lab.ps1 play <playbook> [extra ansible-playbook args]"
@@ -332,6 +345,7 @@ Usage: .\lab.ps1 <command>
 
 Lab lifecycle:
   doctor        Check local prerequisites
+  version       Print the lab version (for pro content compatibility)
   up            Build and start the lab
   down          Stop and remove lab containers
   reset         Rebuild the lab from scratch

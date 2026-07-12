@@ -1,0 +1,10 @@
+---
+- name: Validate nginx configuration
+  ansible.builtin.command:
+    cmd: "{{ web_config_test_cmd }}"
+  changed_when: false
+
+- name: Reload nginx
+  ansible.builtin.service:
+    name: "{{ web_service_name }}"
+    state: reloaded

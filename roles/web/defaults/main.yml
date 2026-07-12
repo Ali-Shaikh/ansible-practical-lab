@@ -1,0 +1,6 @@
+---
+web_root: /var/www/html
+web_service_name: nginx
+# Command used by the validate handler before reload (must exit non-zero on
+# broken config). Override together with web_service_name if you change stack.
+web_config_test_cmd: nginx -t

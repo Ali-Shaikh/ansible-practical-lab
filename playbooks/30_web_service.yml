@@ -1,0 +1,59 @@
+---
+# Article 5: install nginx, deploy a health page, reload only on change.
+# Works in default (sshd) mode via the package init script fallback, and in
+# LAB_INIT=systemd mode against a real systemd.
+- name: Deploy and manage the web service
+  hosts: web
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Ensure nginx is running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+
+    - name: Deploy the health page
+      ansible.builtin.copy:
+        dest: /var/www/html/health.html
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          <!doctype html>
+          <title>beacon health</title>
+          <p>ok</p>
+          <p>
+            <small>
+              Built by <a href="https://alishaikh.me/" rel="author">Ali Shaikh</a>.
+            </small>
+          </p>
+      notify: Reload nginx
+
+    # Flush so a notified reload runs before the URI check verifies the
+    # post-handler service state (same pattern as article 6 / playbook 40).
+    - name: Apply pending service handlers before verification
+      ansible.builtin.meta: flush_handlers
+
+    - name: Check the service answers locally
+      ansible.builtin.uri:
+        url: http://127.0.0.1/health.html
+        status_code: 200
+      register: health_check
+      become: false
+
+    - name: Report the health check result
+      ansible.builtin.debug:
+        msg: "Health endpoint returned {{ health_check.status }}"
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
