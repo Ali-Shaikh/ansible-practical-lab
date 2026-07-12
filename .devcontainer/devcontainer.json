@@ -5,7 +5,11 @@
   "name": "Ansible Practical Lab",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "toolsToInstall": "ansible,ansible-lint"
+    }
   },
   "customizations": {
     "vscode": {
@@ -24,5 +28,5 @@
   // Confirms git, docker, ssh-keygen and free ports as soon as the
   // container is ready, so the first thing a learner sees is a green check.
   // The loop rides out the docker-in-docker daemon still starting up.
-  "postCreateCommand": "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done; ./lab doctor"
+  "postCreateCommand": "ansible-galaxy collection install -r requirements.yml && for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done; ./lab doctor"
 }
