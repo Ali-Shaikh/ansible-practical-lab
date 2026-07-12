@@ -2,14 +2,16 @@
 // Containers) and the whole lab runs inside the workspace container via
 // docker-in-docker. Nothing is needed on the local machine, not even Docker.
 //
-// Python comes from the pre-built MCR image (not the GHCR python Feature) so
-// Codespaces does not need to fetch ghcr.io/devcontainers/features/python.
-// Ansible tooling is installed in postCreateCommand via pipx.
+// Python: pre-built MCR image (no GHCR python Feature).
+// Docker: vendored local Feature under .devcontainer/features/ so Codespaces
+// never has to pull Features from ghcr.io (which was failing with a generic
+// "permission / not logged in" resolve error).
+// Ansible: installed in postCreateCommand via pipx.
 {
   "name": "Ansible Practical Lab",
   "image": "mcr.microsoft.com/devcontainers/python:1-3.12",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "./features/docker-in-docker": {}
   },
   "customizations": {
     "vscode": {

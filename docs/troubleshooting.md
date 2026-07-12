@@ -5,17 +5,23 @@
 If GitHub Codespaces fails during container creation with an error like:
 
 ```text
-ERR: Feature 'ghcr.io/devcontainers/features/python:1' could not be processed.
+ERR: Feature 'ghcr.io/devcontainers/features/…' could not be processed.
 You may not have permission to access this Feature, or may not be logged in.
 ```
 
-the CLI failed while resolving a Feature from GHCR (often a transient registry/auth problem, not a private package). This lab avoids the Python Feature and uses the pre-built image `mcr.microsoft.com/devcontainers/python:1-3.12` instead; Ansible is installed in `postCreateCommand`.
+the CLI failed while resolving a Feature from GHCR. That message is generic: the Feature may be public, and the real problem is often registry reachability from the Codespaces host, not private package access.
 
-If you still hit a Feature resolve error (for example on `docker-in-docker`):
+This lab is set up to avoid GHCR Feature pulls:
 
-1. Delete the failed Codespace and create a new one (retry often succeeds).
-2. Ensure you are opening the branch that contains the current `.devcontainer/devcontainer.json`.
-3. As a last resort, temporarily remove `.devcontainer/devcontainer-lock.json` so Features resolve without pin, then rebuild.
+- Python comes from `mcr.microsoft.com/devcontainers/python:1-3.12`
+- Docker-in-Docker is a **local** Feature under `.devcontainer/features/docker-in-docker` (vendored from the official Microsoft Feature)
+- Ansible is installed in `postCreateCommand` via pipx
+
+If create still fails:
+
+1. Confirm the Codespace branch includes those files (not an older commit that still references `ghcr.io/devcontainers/features/...`).
+2. Delete the failed Codespace and create a new one after the branch is up to date.
+3. Recovery containers (base alpine with no lab tooling) mean the real devcontainer never started; rebuild after the fix is on the branch.
 
 ## Docker Is Not Running
 
