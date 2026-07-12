@@ -1,0 +1,8 @@
+---
+- name: Verify Ansible can reach the lab hosts
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Run the Ansible ping module
+      ansible.builtin.ping:

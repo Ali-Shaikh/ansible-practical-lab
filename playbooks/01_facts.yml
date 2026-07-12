@@ -1,0 +1,13 @@
+---
+- name: Gather and display a few useful facts
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Show operating system summary
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          distribution: "{{ ansible_facts['distribution'] }}"
+          version: "{{ ansible_facts['distribution_version'] }}"
+          python: "{{ ansible_facts['python_version'] }}"

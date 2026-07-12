@@ -1,0 +1,85 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: |
+          bash -n lab
+          bash -n scripts/doctor.sh
+          bash -n docker/managed-host/entrypoint.sh
+          bash -n docker/control-node/entrypoint.sh
+
+      - name: Validate Compose file
+        run: docker compose config
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pipx
+          pipx install --include-deps ansible
+          pipx install ansible-lint
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Galaxy collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Validate playbook syntax
+        run: |
+          ansible-playbook -i inventory/lab playbooks/00_ping.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/01_facts.yml --syntax-check
+          ansible-playbook -i inventory/lab playbooks/10_baseline.yml --syntax-check
+
+      - name: Lint playbooks and inventories
+        run: ansible-lint
+
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Start the lab
+        run: ./lab up
+
+      - name: Ping all managed hosts
+        run: ./lab ping
+
+      - name: Run the baseline playbook
+        run: ./lab play playbooks/10_baseline.yml
+
+      - name: Add a host and reach it
+        run: |
+          ./lab add-host cypress web
+          ./lab up
+          ./lab ping
+
+      - name: Remove the added host
+        run: ./lab remove-host cypress
+
+      - name: Start the studio and check it serves
+        run: |
+          ./lab studio
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8443/healthz >/dev/null; then
+              echo "studio is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "studio did not become healthy in time"
+          docker logs apl-studio | tail -50
+          exit 1
+
+      - name: Tear the lab down
+        run: ./lab down

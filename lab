@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+COMMAND="${1:-help}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+# The lab estate is docker-compose.yml plus one drop-in file per added host
+# under compose.hosts/. Every compose call must see the same file list.
+COMPOSE_FILES=(-f docker-compose.yml)
+for host_file in compose.hosts/*.yml; do
+  [[ -e "$host_file" ]] && COMPOSE_FILES+=(-f "$host_file")
+done
+
+compose() {
+  docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
+ensure_lab_key() {
+  local key_dir="$ROOT_DIR/.lab/ssh"
+  local key_file="$key_dir/id_ed25519"
+  mkdir -p "$key_dir"
+  if [[ ! -f "$key_file" ]]; then
+    if ! command -v ssh-keygen >/dev/null 2>&1; then
+      echo "ssh-keygen is required to create the lab SSH key."
+      exit 1
+    fi
+    ssh-keygen -t ed25519 -N "" -C "ansible-practical-lab" -f "$key_file" >/dev/null
+  fi
+  cp "$key_file.pub" "$key_dir/authorized_keys"
+  chmod 700 "$key_dir"
+  chmod 600 "$key_file" "$key_dir/authorized_keys"
+  chmod 644 "$key_file.pub"
+}
+
+run_forge() {
+  compose run --rm forge "$@"
+}
+
+# Default hosts live in docker-compose.yml; added hosts have one drop-in
+# compose file and one drop-in inventory file per inventory.
+DEFAULT_HOSTS=(forge atlas beacon ledger vaultbox)
+# Default hosts, lab groups and Ansible keywords: a host with one of these
+# names would clash inside the merged inventory.
+RESERVED_NAMES=(forge atlas beacon ledger vaultbox linux web database secrets all ungrouped localhost)
+
+validate_host_name() {
+  local name="$1"
+  if [[ ! "$name" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "Host name must start with a letter and use only lowercase letters, digits and dashes: $name"
+    exit 2
+  fi
+  for reserved in "${RESERVED_NAMES[@]}"; do
+    if [[ "$name" == "$reserved" ]]; then
+      echo "Name '$name' is reserved (default host, lab group, or Ansible keyword)."
+      exit 2
+    fi
+  done
+}
+
+next_free_ssh_port() {
+  local port=2226
+  while grep -qs "\"${port}:22\"" compose.hosts/*.yml docker-compose.yml; do
+    port=$((port + 1))
+  done
+  echo "$port"
+}
+
+add_host() {
+  local name="${1:-}"
+  local group="${2:-}"
+  if [[ -z "$name" ]]; then
+    echo "Usage: ./lab add-host <name> [group]"
+    echo "Example: ./lab add-host titan web"
+    exit 2
+  fi
+  validate_host_name "$name"
+  if [[ -e "compose.hosts/$name.yml" ]]; then
+    echo "Host '$name' already exists (compose.hosts/$name.yml)."
+    exit 2
+  fi
+  if [[ -n "$group" ]]; then
+    if [[ ! "$group" =~ ^[a-z][a-z0-9_]*$ ]]; then
+      echo "Group name must start with a letter and use only lowercase letters, digits and underscores: $group"
+      exit 2
+    fi
+    # A group that shares a name with any host would clash in the inventory.
+    for clash in all ungrouped localhost "$name" "${DEFAULT_HOSTS[@]}"; do
+      if [[ "$group" == "$clash" ]]; then
+        echo "Group name '$group' clashes with a host name or Ansible keyword."
+        exit 2
+      fi
+    done
+    if [[ -e "compose.hosts/$group.yml" ]]; then
+      echo "Group name '$group' clashes with the added host of the same name."
+      exit 2
+    fi
+  fi
+  # Likewise, refuse a host name that matches a group created by an
+  # earlier add-host (groups sit at four-space indent in the drop-ins).
+  if grep -qs "^    $name:" inventory/lab/*.yml; then
+    echo "Host name '$name' clashes with an existing inventory group."
+    exit 2
+  fi
+
+  local ssh_port
+  ssh_port="$(next_free_ssh_port)"
+
+  mkdir -p compose.hosts
+  cat > "compose.hosts/$name.yml" <<COMPOSE
+services:
+  $name:
+    build:
+      context: ./docker/managed-host
+      args:
+        UBUNTU_VERSION: \${UBUNTU_VERSION:-24.04}
+        HOST_USER: \${LAB_USER:-learner}
+        HOST_PASSWORD: \${LAB_PASSWORD:-learner}
+    container_name: apl-$name
+    hostname: $name
+    ports:
+      - "$ssh_port:22"
+    volumes:
+      - ./.lab/ssh:/lab-ssh:ro
+    networks:
+      lab:
+        aliases:
+          - $name
+COMPOSE
+
+  {
+    echo "---"
+    echo "all:"
+    echo "  children:"
+    echo "    linux:"
+    echo "      hosts:"
+    echo "        $name:"
+    echo "          ansible_host: $name"
+    if [[ -n "$group" ]]; then
+      echo "    $group:"
+      echo "      hosts:"
+      echo "        $name:"
+    fi
+  } > "inventory/lab/$name.yml"
+
+  {
+    echo "---"
+    echo "all:"
+    echo "  children:"
+    echo "    linux:"
+    echo "      hosts:"
+    echo "        $name:"
+    echo "          ansible_host: 127.0.0.1"
+    echo "          ansible_port: $ssh_port"
+    if [[ -n "$group" ]]; then
+      echo "    $group:"
+      echo "      hosts:"
+      echo "        $name:"
+    fi
+  } > "inventory/local/$name.yml"
+
+  echo "Added host '$name' (SSH on 127.0.0.1:$ssh_port${group:+, group: $group})."
+  echo "Files created:"
+  echo "  compose.hosts/$name.yml"
+  echo "  inventory/lab/$name.yml"
+  echo "  inventory/local/$name.yml"
+  echo "Start it with: ./lab up"
+}
+
+remove_host() {
+  local name="${1:-}"
+  if [[ -z "$name" ]]; then
+    echo "Usage: ./lab remove-host <name>"
+    exit 2
+  fi
+  validate_host_name "$name"
+  if [[ ! -e "compose.hosts/$name.yml" ]]; then
+    echo "Host '$name' was not added with add-host (compose.hosts/$name.yml not found)."
+    exit 2
+  fi
+  compose rm --stop --force "$name" >/dev/null 2>&1 || true
+  rm -f "compose.hosts/$name.yml" "inventory/lab/$name.yml" "inventory/local/$name.yml"
+  echo "Removed host '$name'."
+}
+
+case "$COMMAND" in
+  doctor)
+    bash scripts/doctor.sh
+    ;;
+  up)
+    ensure_lab_key
+    compose build forge
+    compose up -d --build
+    ;;
+  down)
+    # --profile studio so the optional studio container is torn down too.
+    compose --profile studio down --remove-orphans
+    ;;
+  reset)
+    compose --profile studio down --volumes --remove-orphans
+    ensure_lab_key
+    compose build forge
+    compose up -d --build
+    ;;
+  status)
+    compose --profile studio ps
+    ;;
+  studio)
+    ensure_lab_key
+    compose up -d --build studio
+    echo ""
+    echo "Studio is starting at: http://127.0.0.1:8443"
+    echo "Open it in your browser; the integrated terminal is already on the"
+    echo "lab network, so commands like 'ansible all -m ping' work directly."
+    echo "Stop it with: ./lab down"
+    ;;
+  ping)
+    run_forge ansible all -i inventory/lab -m ansible.builtin.ping
+    ;;
+  facts)
+    run_forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
+    ;;
+  play)
+    if [[ $# -lt 1 ]]; then
+      echo "Usage: ./lab play <playbook> [extra ansible-playbook args]"
+      exit 2
+    fi
+    run_forge ansible-playbook -i inventory/lab "$@"
+    ;;
+  ansible*)
+    # Pass any ansible CLI straight through to the control node, e.g.
+    #   ./lab ansible web -m ansible.builtin.command -a uptime
+    #   ./lab ansible-vault encrypt secrets.yml
+    #   ./lab ansible-doc ansible.builtin.copy
+    run_forge "$COMMAND" "$@"
+    ;;
+  lint)
+    run_forge ansible-lint "$@"
+    ;;
+  inventory)
+    run_forge ansible-inventory -i inventory/lab --graph "$@"
+    ;;
+  add-host)
+    add_host "$@"
+    ;;
+  remove-host)
+    remove_host "$@"
+    ;;
+  exec)
+    if [[ $# -lt 1 ]]; then
+      echo "Usage: ./lab exec <command> [args]"
+      exit 2
+    fi
+    run_forge "$@"
+    ;;
+  shell)
+    run_forge bash
+    ;;
+  logs)
+    compose logs "$@"
+    ;;
+  help|-h|--help)
+    cat <<'HELP'
+Usage: ./lab <command>
+
+Lab lifecycle:
+  doctor        Check local prerequisites
+  up            Build and start the lab
+  down          Stop and remove lab containers
+  reset         Rebuild the lab from scratch
+  status        Show container status
+  logs          Show Docker Compose logs
+  studio        Start VS Code in the browser at http://127.0.0.1:8443
+
+Ansible:
+  ping          Run ansible.builtin.ping against all managed hosts
+  facts         Gather a few useful facts from all managed hosts
+  play          Run a playbook, e.g. ./lab play playbooks/10_baseline.yml
+  ansible...    Run any ansible CLI in the control node, e.g.
+                ./lab ansible web -m ansible.builtin.command -a uptime
+                ./lab ansible-vault encrypt vars/secret.yml
+                ./lab ansible-galaxy collection list
+  lint          Run ansible-lint over the repo (or given paths)
+  inventory     Show the inventory as a group graph
+
+Hosts:
+  add-host      Add a managed host, e.g. ./lab add-host titan web
+  remove-host   Remove a host created with add-host
+
+Other:
+  shell         Open a shell in the control-node container
+  exec          Run any command in the control-node container
+HELP
+    ;;
+  *)
+    echo "Unknown command: $COMMAND"
+    echo "Run ./lab help"
+    exit 2
+    ;;
+esac
