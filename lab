@@ -55,6 +55,27 @@ run_forge() {
   compose run --rm forge "$@"
 }
 
+# inventory/lab uses Docker DNS names (atlas, ledger, …). Those only resolve
+# and route on the compose lab network. Fail fast if managed hosts are down.
+ensure_managed_hosts() {
+  local missing=()
+  local name
+  for name in atlas beacon ledger vaultbox; do
+    if [[ -z "$(docker ps --filter "name=^apl-${name}$" --filter status=running --format '{{.Names}}' 2>/dev/null)" ]]; then
+      missing+=("$name")
+    fi
+  done
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    echo "Managed host container(s) not running: ${missing[*]}"
+    echo "Start the estate first:"
+    echo "  ./lab up"
+    echo "Then retry. Do not run host-side 'ansible … -i inventory/lab' from the"
+    echo "Codespace/workspace shell: that inventory only works inside forge"
+    echo "(./lab ping / ./lab play …) or studio on the lab network."
+    exit 1
+  fi
+}
+
 # Default hosts live in docker-compose.yml; added hosts have one drop-in
 # compose file and one drop-in inventory file per inventory.
 DEFAULT_HOSTS=(forge atlas beacon ledger vaultbox)
@@ -233,9 +254,11 @@ case "$COMMAND" in
     echo "Stop it with: ./lab down"
     ;;
   ping)
+    ensure_managed_hosts
     run_forge ansible all -i inventory/lab -m ansible.builtin.ping
     ;;
   facts)
+    ensure_managed_hosts
     run_forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
     ;;
   version)
@@ -250,6 +273,7 @@ case "$COMMAND" in
       echo "Usage: ./lab play <playbook> [extra ansible-playbook args]"
       exit 2
     fi
+    ensure_managed_hosts
     run_forge ansible-playbook -i inventory/lab "$@"
     ;;
   ansible*)
@@ -257,6 +281,12 @@ case "$COMMAND" in
     #   ./lab ansible web -m ansible.builtin.command -a uptime
     #   ./lab ansible-vault encrypt secrets.yml
     #   ./lab ansible-doc ansible.builtin.copy
+    # Connectivity modules need the estate up; vault/doc/galaxy do not.
+    case "$COMMAND" in
+      ansible|ansible-playbook|ansible-console)
+        ensure_managed_hosts
+        ;;
+    esac
     run_forge "$COMMAND" "$@"
     ;;
   lint)

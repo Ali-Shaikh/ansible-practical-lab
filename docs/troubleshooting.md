@@ -57,18 +57,63 @@ Install Docker Desktop or the Docker Compose plugin if the command is missing.
 
 ## Ansible Cannot Reach Hosts
 
-Check the containers:
+Typical error:
 
-```bash
-./lab status
+```text
+ssh: connect to host atlas port 22: Connection timed out
+UNREACHABLE!
 ```
 
-Then reset the lab:
+### Cause
+
+`inventory/lab` targets Docker DNS names (`atlas`, `ledger`, …). Those only
+work **on the lab compose network** (inside `forge` or `studio`). They do
+**not** work from the Codespace/workspace shell with host-installed Ansible.
+
+`Connection timed out` almost always means either:
+
+1. Managed hosts are not running (`./lab up` never run or containers exited), or
+2. Ansible was run outside forge (wrong network).
+
+`Connection refused` usually means the container is up but sshd is not ready;
+wait a few seconds or check `./lab logs atlas`.
+
+### Fix
+
+```bash
+./lab status          # apl-atlas, apl-beacon, apl-ledger, apl-vaultbox = Up
+./lab up              # if any are missing
+./lab ping            # always via the wrapper (runs inside forge)
+```
+
+If status looks fine but ping still times out:
 
 ```bash
 ./lab reset
 ./lab ping
 ```
+
+From the Codespace shell, **do not** use:
+
+```bash
+ansible all -m ping                    # uses inventory/lab off the lab network
+```
+
+Use:
+
+```bash
+./lab ping
+# or
+./lab ansible all -m ansible.builtin.ping
+```
+
+Host-side Ansible (rare) must use the local inventory and published ports:
+
+```bash
+ansible all -i inventory/local -m ansible.builtin.ping
+```
+
+That path needs OpenSSH on the machine and ports 2222–2225 free/published.
 
 ## SSH Key Problems
 
