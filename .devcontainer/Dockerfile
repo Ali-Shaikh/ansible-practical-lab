@@ -1,14 +1,7 @@
 # Codespaces / Dev Containers workspace image for the Ansible lab.
 #
-# Root cause we avoid:
-# 1) GHCR Feature resolve often fails in Codespaces with a generic
-#    "permission / not logged in" error.
-# 2) Installing Features on mcr.microsoft.com/devcontainers/python runs
-#    apt-get update, which exits 100 because that image ships a broken
-#    Yarn apt source (expired / missing GPG key). Same exit code 100 seen
-#    in Codespaces build logs for docker-in-docker.
-#
-# So: clean Ubuntu base, install Docker CE from docker.com, no Features.
+# Avoids Dev Container Features (GHCR resolve failures + python-image Yarn GPG
+# breaking apt with exit 100). Clean Ubuntu base + Docker CE + DinD entrypoint.
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 USER root
@@ -18,10 +11,14 @@ RUN apt-get update \
         ca-certificates \
         curl \
         gnupg \
+        iptables \
+        pigz \
         python3 \
         python3-pip \
         python3-venv \
         pipx \
+        uidmap \
+        xz-utils \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
@@ -38,16 +35,19 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -f docker \
-    && usermod -aG docker vscode
+    && usermod -aG docker vscode \
+    && mkdir -p /usr/local/share \
+    && echo 'export PATH="/home/vscode/.local/bin:$PATH"' > /etc/profile.d/vscode-local-bin.sh
 
 COPY docker-init.sh /usr/local/share/docker-init.sh
 RUN chmod +x /usr/local/share/docker-init.sh
 
-USER vscode
-ENV PATH="/home/vscode/.local/bin:${PATH}" \
-    DOCKER_BUILDKIT="1" \
+# Keep root as image user so ENTRYPOINT can start dockerd.
+# Codespaces/VS Code connect as vscode via remoteUser in devcontainer.json.
+ENV DOCKER_BUILDKIT="1" \
     PIPX_HOME="/home/vscode/.local/pipx" \
-    PIPX_BIN_DIR="/home/vscode/.local/bin"
+    PIPX_BIN_DIR="/home/vscode/.local/bin" \
+    PATH="/home/vscode/.local/bin:${PATH}"
 
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 CMD ["sleep", "infinity"]

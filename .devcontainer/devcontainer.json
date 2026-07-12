@@ -1,21 +1,27 @@
 // Zero-install path for GitHub Codespaces / VS Code Dev Containers.
 //
-// No Dev Container Features: GHCR Feature resolve is unreliable here, and the
-// python image breaks apt (Yarn GPG) during Feature install (exit 100).
-// Docker + Python are installed in .devcontainer/Dockerfile from a clean
-// Ubuntu 24.04 base. DinD needs privileged + a docker data volume.
+// No Features. Dockerfile installs Docker CE + Python. DinD needs privileged
+// mode and an entrypoint that starts dockerd before postCreate runs.
 {
   "name": "Ansible Practical Lab",
   "build": {
     "dockerfile": "Dockerfile",
     "context": "."
   },
-  "runArgs": ["--privileged"],
+  // Ensure DinD init runs even when the agent rewrites the container command.
+  "entrypoint": "/usr/local/share/docker-init.sh",
+  "overrideCommand": false,
+  "remoteUser": "vscode",
+  "runArgs": [
+    "--privileged",
+    "--cgroupns=host"
+  ],
   "mounts": [
     "source=dind-var-lib-docker-${devcontainerId},target=/var/lib/docker,type=volume"
   ],
   "containerEnv": {
-    "DOCKER_BUILDKIT": "1"
+    "DOCKER_BUILDKIT": "1",
+    "PATH": "/home/vscode/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   },
   "customizations": {
     "vscode": {
@@ -31,5 +37,7 @@
       "label": "beacon web"
     }
   },
-  "postCreateCommand": "pipx install --include-deps ansible && pipx install ansible-lint && ansible-galaxy collection install -r requirements.yml && for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done; ./lab doctor"
+  // Wait longer for dockerd; surface log on failure. ANSIBLE_CONFIG avoids the
+  // world-writable ansible.cfg warning on Codespaces mounts.
+  "postCreateCommand": "export PATH=\"/home/vscode/.local/bin:$PATH\"; export ANSIBLE_CONFIG=/workspaces/ansible-practical-lab/ansible.cfg; pipx install --include-deps ansible && pipx install ansible-lint && ansible-galaxy collection install -r requirements.yml && for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; echo \"waiting for dockerd ($i/60)...\"; sleep 2; done; if ! docker info >/dev/null 2>&1; then echo '--- /tmp/dockerd.log ---'; cat /tmp/dockerd.log 2>/dev/null || true; exit 1; fi; ./lab doctor"
 }
