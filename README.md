@@ -20,14 +20,15 @@ terminal:
 ./lab ping
 ```
 
-The Codespace also installs Python, Ansible, ansible-lint and the repository's
-Galaxy collections so the Red Hat Ansible extension can validate files without
-asking you to create another environment. The `./lab` commands still run
-Ansible through the reproducible `forge` container.
+The Codespace builds a clean Ubuntu image with Docker (DinD) and Python,
+then installs Ansible, ansible-lint and Galaxy collections so the Red Hat
+Ansible extension can validate files without another environment. The
+`./lab` commands still run Ansible through the reproducible `forge`
+container.
 
-The devcontainer brings its own Docker engine, so the whole estate runs
-inside the Codespace. The same configuration works locally with the
-VS Code Dev Containers extension.
+The workspace container runs its own Docker engine (privileged DinD), so
+the whole estate runs inside the Codespace. The same configuration works
+locally with the VS Code Dev Containers extension.
 
 ## Quick Start
 

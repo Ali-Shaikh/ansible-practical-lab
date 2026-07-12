@@ -1,17 +1,21 @@
-// Zero-install path: open this repo in GitHub Codespaces (or VS Code Dev
-// Containers) and the whole lab runs inside the workspace container via
-// docker-in-docker. Nothing is needed on the local machine, not even Docker.
+// Zero-install path for GitHub Codespaces / VS Code Dev Containers.
 //
-// Python: pre-built MCR image (no GHCR python Feature).
-// Docker: vendored local Feature under .devcontainer/features/ so Codespaces
-// never has to pull Features from ghcr.io (which was failing with a generic
-// "permission / not logged in" resolve error).
-// Ansible: installed in postCreateCommand via pipx.
+// No Dev Container Features: GHCR Feature resolve is unreliable here, and the
+// python image breaks apt (Yarn GPG) during Feature install (exit 100).
+// Docker + Python are installed in .devcontainer/Dockerfile from a clean
+// Ubuntu 24.04 base. DinD needs privileged + a docker data volume.
 {
   "name": "Ansible Practical Lab",
-  "image": "mcr.microsoft.com/devcontainers/python:1-3.12",
-  "features": {
-    "./features/docker-in-docker": {}
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "runArgs": ["--privileged"],
+  "mounts": [
+    "source=dind-var-lib-docker-${devcontainerId},target=/var/lib/docker,type=volume"
+  ],
+  "containerEnv": {
+    "DOCKER_BUILDKIT": "1"
   },
   "customizations": {
     "vscode": {
@@ -21,15 +25,11 @@
       ]
     }
   },
-  // beacon's web port; SSH ports stay internal to the workspace.
   "forwardPorts": [8080],
   "portsAttributes": {
     "8080": {
       "label": "beacon web"
     }
   },
-  // Confirms git, docker, ssh-keygen and free ports as soon as the
-  // container is ready, so the first thing a learner sees is a green check.
-  // The loop rides out the docker-in-docker daemon still starting up.
   "postCreateCommand": "pipx install --include-deps ansible && pipx install ansible-lint && ansible-galaxy collection install -r requirements.yml && for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done; ./lab doctor"
 }

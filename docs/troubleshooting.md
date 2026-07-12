@@ -1,27 +1,37 @@
 # Troubleshooting
 
-## Codespaces: Feature Could Not Be Processed
+## Codespaces container create fails
 
-If GitHub Codespaces fails during container creation with an error like:
+### Symptom A: Feature could not be processed (GHCR)
 
 ```text
 ERR: Feature 'ghcr.io/devcontainers/features/…' could not be processed.
 You may not have permission to access this Feature, or may not be logged in.
 ```
 
-the CLI failed while resolving a Feature from GHCR. That message is generic: the Feature may be public, and the real problem is often registry reachability from the Codespaces host, not private package access.
+This lab **does not use Dev Container Features**. If you still see this, the Codespace is on an **old commit**. Open branch `feature/lab-repair-from-bootstrap` (or main after it lands) and recreate the Codespace.
 
-This lab is set up to avoid GHCR Feature pulls:
+### Symptom B: docker buildx exit code 100 during Feature install
 
-- Python comes from `mcr.microsoft.com/devcontainers/python:1-3.12`
-- Docker-in-Docker is a **local** Feature under `.devcontainer/features/docker-in-docker` (vendored from the official Microsoft Feature)
-- Ansible is installed in `postCreateCommand` via pipx
+```text
+./devcontainer-features-install.sh … exit code: 100
+```
 
-If create still fails:
+Root cause (confirmed in similar public reports and Microsoft image issues):
 
-1. Confirm the Codespace branch includes those files (not an older commit that still references `ghcr.io/devcontainers/features/...`).
-2. Delete the failed Codespace and create a new one after the branch is up to date.
-3. Recovery containers (base alpine with no lab tooling) mean the real devcontainer never started; rebuild after the fix is on the branch.
+1. Feature install runs `apt-get update` inside the base image.
+2. `mcr.microsoft.com/devcontainers/python` ships a **Yarn apt source** whose GPG key is expired/missing.
+3. `apt-get update` fails → exit **100** (same for docker-in-docker Feature install).
+
+References: [devcontainers/images#1752](https://github.com/devcontainers/images/issues/1752), same exit-100 pattern on python + dind in Codespaces.
+
+**This lab's fix:** `.devcontainer/Dockerfile` uses clean `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`, installs Docker CE from docker.com and Python from Ubuntu apt. No Features, no Yarn apt repo.
+
+If create still fails, confirm the branch has `.devcontainer/Dockerfile` and `devcontainer.json` with `"build": { "dockerfile": "Dockerfile" }` (not `image` + `features`).
+
+### Recovery alpine container
+
+If Codespaces drops you into a recovery alpine image, the real build failed. Delete the Codespace and recreate after the Dockerfile-based config is on the branch.
 
 ## Docker Is Not Running
 
@@ -32,6 +42,8 @@ docker version
 ```
 
 Docker should show both a client and server.
+
+Inside a Codespace, if the client works but the server does not, check `/tmp/dockerd.log` (DinD entrypoint log).
 
 ## Compose Is Missing
 
