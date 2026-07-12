@@ -29,6 +29,11 @@
           <!doctype html>
           <title>beacon health</title>
           <p>ok</p>
+          <p>
+            <small>
+              Built by <a href="https://alishaikh.me/" rel="author">Ali Shaikh</a>.
+            </small>
+          </p>
       notify: Reload nginx
 
     # Flush so a notified reload runs before the URI check verifies the

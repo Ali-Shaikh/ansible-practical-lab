@@ -192,6 +192,38 @@ copy that pattern for exposed services. Hosts created with `add-host` keep
 sshd init in either mode. Use the same `LAB_INIT` for `up`, `down` and
 `reset`; run `down` before switching.
 
+The variable selects the systemd Compose overlay for lifecycle commands.
+Once the estate is running, `ping` and `play` connect to those existing hosts
+and do not need the prefix. A complete Bash test looks like this:
+
+```bash
+./lab down
+LAB_INIT=systemd ./lab up
+./lab ping
+./lab play playbooks/21_services_systemd.yml
+./lab play playbooks/21_services_systemd.yml  # expect changed=0
+curl -fsS http://127.0.0.1:8080/
+LAB_INIT=systemd ./lab down
+```
+
+In PowerShell, set the variable once for the session and remove it after the
+systemd estate is down:
+
+```powershell
+.\lab.ps1 down
+$env:LAB_INIT = "systemd"
+.\lab.ps1 up
+.\lab.ps1 ping
+.\lab.ps1 play playbooks/21_services_systemd.yml
+.\lab.ps1 play playbooks/21_services_systemd.yml  # expect changed=0
+Invoke-WebRequest http://127.0.0.1:8080/ -UseBasicParsing
+.\lab.ps1 down
+Remove-Item Env:LAB_INIT
+```
+
+The expected result is four reachable managed hosts, an HTTP response from
+beacon, and `changed=0` on the second unchanged playbook run.
+
 ## Lab Version
 
 The repo root `VERSION` file is the lab compatibility pin for pro content.
