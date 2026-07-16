@@ -59,6 +59,7 @@ The managed hosts are Ubuntu containers with SSH enabled. That is a lab shortcut
 ```bash
 ./lab doctor
 ./lab up
+./lab systemd                    # switch the default hosts to real systemd
 ./lab status
 ./lab ping
 ./lab facts
@@ -174,14 +175,12 @@ for nginx (article 5) works via that fallback. Tasks that need a real
 systemd (`ansible.builtin.systemd`, full unit control) need systemd mode:
 
 ```bash
-./lab down
-LAB_INIT=systemd ./lab up
+./lab systemd
 ./lab play playbooks/21_services_systemd.yml
 ```
 
 ```powershell
-.\lab.ps1 down
-$env:LAB_INIT = "systemd"; .\lab.ps1 up
+.\lab.ps1 systemd
 .\lab.ps1 play playbooks/21_services_systemd.yml
 ```
 
@@ -189,36 +188,36 @@ Each default host then boots systemd as PID 1 (the Molecule/geerlingguy
 pattern). The trade-off is weaker isolation: privileged containers and the
 host cgroup namespace. Fine for a disposable lab bound to 127.0.0.1; do not
 copy that pattern for exposed services. Hosts created with `add-host` keep
-sshd init in either mode. Use the same `LAB_INIT` for `up`, `down` and
-`reset`; run `down` before switching.
+sshd init in either mode.
 
-The variable selects the systemd Compose overlay for lifecycle commands.
-Once the estate is running, `ping` and `play` connect to those existing hosts
-and do not need the prefix. A complete Bash test looks like this:
+The `systemd` command selects the privileged Compose overlay and lets Compose
+recreate only the default hosts whose configuration changed. No manual
+`down` is needed. Once the estate is running, `ping`, `play`, `status` and
+`down` work normally. Run `./lab up` (or `.\lab.ps1 up`) to switch the
+default hosts back to the unprivileged SSH-only mode.
+
+The older `LAB_INIT=systemd` environment-variable workflow remains supported
+for scripts that already use it, but learners normally only need the command
+above. A complete Bash test looks like this:
 
 ```bash
-./lab down
-LAB_INIT=systemd ./lab up
+./lab systemd
 ./lab ping
 ./lab play playbooks/21_services_systemd.yml
 ./lab play playbooks/21_services_systemd.yml  # expect changed=0
 curl -fsS http://127.0.0.1:8080/
-LAB_INIT=systemd ./lab down
+./lab down
 ```
 
-In PowerShell, set the variable once for the session and remove it after the
-systemd estate is down:
+The PowerShell flow is the same:
 
 ```powershell
-.\lab.ps1 down
-$env:LAB_INIT = "systemd"
-.\lab.ps1 up
+.\lab.ps1 systemd
 .\lab.ps1 ping
 .\lab.ps1 play playbooks/21_services_systemd.yml
 .\lab.ps1 play playbooks/21_services_systemd.yml  # expect changed=0
 Invoke-WebRequest http://127.0.0.1:8080/ -UseBasicParsing
 .\lab.ps1 down
-Remove-Item Env:LAB_INIT
 ```
 
 The expected result is four reachable managed hosts, an HTTP response from

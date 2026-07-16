@@ -7,10 +7,16 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 docker compose config >/dev/null
+docker compose -f docker-compose.yml -f compose.systemd.yml config >/dev/null
 bash -n lab
 bash -n scripts/doctor.sh
 bash -n docker/control-node/entrypoint.sh
 bash -n docker/managed-host/entrypoint.sh
+
+if ! ./lab help | grep -q '^  systemd '; then
+  echo "The lab help does not expose the first-class systemd command." >&2
+  exit 1
+fi
 
 # Vault demo must not be a loadable group_vars file (would ship plaintext).
 if [[ -f inventory/lab/group_vars/secrets/vault_example.yml ]] ||

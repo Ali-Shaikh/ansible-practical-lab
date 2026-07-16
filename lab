@@ -11,10 +11,13 @@ fi
 
 # The lab estate is docker-compose.yml plus one drop-in file per added host
 # under compose.hosts/. Every compose call must see the same file list.
-COMPOSE_FILES=(-f docker-compose.yml)
+BASE_COMPOSE_FILES=(-f docker-compose.yml)
 for host_file in compose.hosts/*.yml; do
-  [[ -e "$host_file" ]] && COMPOSE_FILES+=(-f "$host_file")
+  [[ -e "$host_file" ]] && BASE_COMPOSE_FILES+=(-f "$host_file")
 done
+
+COMPOSE_FILES=("${BASE_COMPOSE_FILES[@]}")
+SYSTEMD_COMPOSE_FILES=("${BASE_COMPOSE_FILES[@]}" -f compose.systemd.yml)
 
 # LAB_INIT=systemd boots the default hosts with systemd as PID 1 so that
 # service and systemd modules work; see compose.systemd.yml for the cost.
@@ -32,6 +35,10 @@ esac
 
 compose() {
   docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
+compose_systemd() {
+  docker compose "${SYSTEMD_COMPOSE_FILES[@]}" "$@"
 }
 
 ensure_lab_key() {
@@ -210,6 +217,19 @@ case "$COMMAND" in
     compose build forge
     compose up -d --build
     ;;
+  systemd)
+    if [[ $# -gt 0 ]]; then
+      echo "Usage: ./lab systemd"
+      exit 2
+    fi
+    ensure_lab_key
+    compose_systemd build forge
+    compose_systemd up -d --build
+    echo ""
+    echo "Systemd mode is ready on the four default managed hosts."
+    echo "This mode uses privileged containers and a host cgroup mount."
+    echo "Run './lab up' to return those hosts to the default SSH-only mode."
+    ;;
   down)
     # --profile studio so the optional studio container is torn down too.
     compose --profile studio down --remove-orphans
@@ -292,6 +312,7 @@ Lab lifecycle:
   doctor        Check local prerequisites
   version       Print the lab version (for pro content compatibility)
   up            Build and start the lab
+  systemd       Start with real systemd (uses privileged containers)
   down          Stop and remove lab containers
   reset         Rebuild the lab from scratch
   status        Show container status
@@ -317,13 +338,9 @@ Other:
   shell         Open a shell in the control-node container
   exec          Run any command in the control-node container
 
-Environment:
-  LAB_INIT=systemd   Boot the default hosts with systemd as PID 1 so
-                     service/systemd tasks work, e.g.
-                       LAB_INIT=systemd ./lab up
-                     Switch modes with the same variable on 'up' after a
-                     'down'. Costs privileged containers; see
-                     compose.systemd.yml.
+Compatibility:
+  LAB_INIT=systemd   The older environment-variable workflow remains
+                     supported. For normal use, prefer './lab systemd'.
 HELP
     ;;
   *)

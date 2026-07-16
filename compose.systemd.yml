@@ -1,7 +1,8 @@
-# Applied by the lab wrappers when LAB_INIT=systemd. Each default managed
-# host then boots a real systemd as PID 1 (the Molecule/geerlingguy pattern),
-# so ansible.builtin.service and ansible.builtin.systemd behave as they
-# would on a full server.
+# Applied by ./lab systemd, .\lab.ps1 systemd, or the compatible
+# LAB_INIT=systemd workflow. Each default managed host then boots a real
+# systemd as PID 1 (the Molecule/geerlingguy pattern), so
+# ansible.builtin.service and ansible.builtin.systemd behave as they would
+# on a full server.
 #
 # The price is weaker container isolation: privileged mode, the host cgroup
 # namespace and a writable cgroupfs. Acceptable for a disposable lab that
