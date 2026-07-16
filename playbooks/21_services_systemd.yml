@@ -1,7 +1,7 @@
 ---
 # Requires systemd mode: start the lab with
-#   LAB_INIT=systemd ./lab up        (bash)
-#   $env:LAB_INIT = "systemd"; .\lab.ps1 up   (PowerShell)
+#   ./lab systemd        (Bash)
+#   .\lab.ps1 systemd    (PowerShell)
 # The first task explains this instead of failing half-way through.
 - name: Manage a service with a handler
   hosts: web
@@ -15,8 +15,8 @@
           - ansible_facts.service_mgr == "systemd"
         fail_msg: >-
           This host runs sshd as PID 1, so service management is not
-          available. Restart the lab in systemd mode:
-          down, then LAB_INIT=systemd ./lab up
+          available. Start systemd mode with the lab's systemd command,
+          then run this playbook again.
         success_msg: "systemd is PID 1; service tasks will work."
 
     - name: Install the web server

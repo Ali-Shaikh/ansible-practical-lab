@@ -20,7 +20,9 @@ jobs:
           bash -n docker/control-node/entrypoint.sh
 
       - name: Validate Compose file
-        run: docker compose config
+        run: |
+          docker compose config
+          docker compose -f docker-compose.yml -f compose.systemd.yml config
 
       - name: Install Ansible
         run: |
@@ -101,6 +103,29 @@ jobs:
 
       - name: Remove the added host
         run: ./lab remove-host cypress
+
+      - name: Exercise the one-command systemd mode and return path
+        run: |
+          set -euo pipefail
+          ./lab systemd
+          ./lab ping
+          for host in atlas beacon ledger vaultbox; do
+            test "$(docker exec "apl-$host" cat /proc/1/comm)" = "systemd"
+            test "$(docker inspect --format '{{.HostConfig.Privileged}}' "apl-$host")" = "true"
+          done
+          ./lab play playbooks/21_services_systemd.yml
+          out="$(./lab play playbooks/21_services_systemd.yml 2>&1 | tee /dev/stderr)" || exit 1
+          if printf '%s\n' "$out" | grep -E 'changed=[1-9][0-9]*' | grep -E 'ok=' >/dev/null; then
+            echo "Idempotency failure: playbooks/21_services_systemd.yml reported non-zero changed on re-run" >&2
+            exit 1
+          fi
+
+          ./lab up
+          ./lab ping
+          for host in atlas beacon ledger vaultbox; do
+            test "$(docker exec "apl-$host" cat /proc/1/comm)" != "systemd"
+            test "$(docker inspect --format '{{.HostConfig.Privileged}}' "apl-$host")" = "false"
+          done
 
       - name: Start the studio and check it serves
         run: |

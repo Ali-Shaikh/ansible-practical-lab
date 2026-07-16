@@ -16,10 +16,13 @@ if ($null -eq $Rest) {
 
 # The lab estate is docker-compose.yml plus one drop-in file per added host
 # under compose.hosts/. Every compose call must see the same file list.
-$script:ComposeFiles = @("-f", "docker-compose.yml")
+$script:BaseComposeFiles = @("-f", "docker-compose.yml")
 Get-ChildItem -Path (Join-Path $PSScriptRoot "compose.hosts") -Filter "*.yml" -File -ErrorAction SilentlyContinue |
     Sort-Object Name |
-    ForEach-Object { $script:ComposeFiles += @("-f", "compose.hosts/$($_.Name)") }
+    ForEach-Object { $script:BaseComposeFiles += @("-f", "compose.hosts/$($_.Name)") }
+
+$script:ComposeFiles = @($script:BaseComposeFiles)
+$script:SystemdComposeFiles = @($script:BaseComposeFiles) + @("-f", "compose.systemd.yml")
 
 # LAB_INIT=systemd boots the default hosts with systemd as PID 1 so that
 # service and systemd modules work; see compose.systemd.yml for the cost.
@@ -37,6 +40,18 @@ $script:ReservedNames = $script:DefaultHosts + @("linux", "web", "database", "se
 
 function Invoke-Compose {
     & docker compose @script:ComposeFiles @args
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "Docker Compose failed with exit code $exitCode."
+    }
+}
+
+function Invoke-SystemdCompose {
+    & docker compose @script:SystemdComposeFiles @args
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "Docker Compose failed with exit code $exitCode."
+    }
 }
 
 function Invoke-Forge {
@@ -200,7 +215,14 @@ function Remove-LabHost {
     if (-not (Test-Path $composeFile)) {
         throw "Host '$Name' was not added with add-host (compose.hosts/$Name.yml not found)."
     }
-    Invoke-Compose rm --stop --force $Name *> $null
+    try {
+        # Match the Bash wrapper's best-effort cleanup when the container is
+        # already absent or Docker is temporarily unavailable.
+        Invoke-Compose rm --stop --force $Name *> $null
+    }
+    catch {
+        # The generated Compose and inventory files remain the source of truth.
+    }
     Remove-Item -Force -ErrorAction SilentlyContinue $composeFile,
         (Join-Path $PSScriptRoot "inventory\lab\$Name.yml"),
         (Join-Path $PSScriptRoot "inventory\local\$Name.yml")
@@ -262,6 +284,18 @@ switch -Wildcard ($Command) {
         Initialize-LabKey
         Invoke-Compose build forge
         Invoke-Compose up -d --build
+    }
+    "systemd" {
+        if ($Rest.Count -gt 0) {
+            throw "Usage: .\lab.ps1 systemd"
+        }
+        Initialize-LabKey
+        Invoke-SystemdCompose build forge
+        Invoke-SystemdCompose up -d --build
+        Write-Host ""
+        Write-Host "Systemd mode is ready on the four default managed hosts."
+        Write-Host "This mode uses privileged containers and a host cgroup mount."
+        Write-Host "Run '.\lab.ps1 up' to return those hosts to the default SSH-only mode."
     }
     "down" {
         # --profile studio so the optional studio container is torn down too.
@@ -347,6 +381,7 @@ Lab lifecycle:
   doctor        Check local prerequisites
   version       Print the lab version (for pro content compatibility)
   up            Build and start the lab
+  systemd       Start with real systemd (uses privileged containers)
   down          Stop and remove lab containers
   reset         Rebuild the lab from scratch
   status        Show container status
@@ -372,13 +407,9 @@ Other:
   shell         Open a shell in the control-node container
   exec          Run any command in the control-node container
 
-Environment:
-  LAB_INIT=systemd   Boot the default hosts with systemd as PID 1 so
-                     service/systemd tasks work, e.g.
-                       `$env:LAB_INIT = "systemd"; .\lab.ps1 up
-                     Switch modes with the same variable on 'up' after a
-                     'down'. Costs privileged containers; see
-                     compose.systemd.yml.
+Compatibility:
+  LAB_INIT=systemd   The older environment-variable workflow remains
+                     supported. For normal use, prefer '.\lab.ps1 systemd'.
 "@
     }
     default {
