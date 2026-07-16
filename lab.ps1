@@ -215,7 +215,14 @@ function Remove-LabHost {
     if (-not (Test-Path $composeFile)) {
         throw "Host '$Name' was not added with add-host (compose.hosts/$Name.yml not found)."
     }
-    Invoke-Compose rm --stop --force $Name *> $null
+    try {
+        # Match the Bash wrapper's best-effort cleanup when the container is
+        # already absent or Docker is temporarily unavailable.
+        Invoke-Compose rm --stop --force $Name *> $null
+    }
+    catch {
+        # The generated Compose and inventory files remain the source of truth.
+    }
     Remove-Item -Force -ErrorAction SilentlyContinue $composeFile,
         (Join-Path $PSScriptRoot "inventory\lab\$Name.yml"),
         (Join-Path $PSScriptRoot "inventory\local\$Name.yml")
