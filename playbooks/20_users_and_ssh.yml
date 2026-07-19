@@ -13,6 +13,10 @@
         groups: "{{ item.groups | default([]) }}"
         append: false
         shell: /bin/bash
+        # Key-only accounts need an unusable password, not a locked one:
+        # the lab sshd runs with UsePAM no, and OpenSSH refuses locked
+        # accounts ("!") for every auth method, public keys included.
+        password: "*"
         state: "{{ item.state }}"
         remove: "{{ item.state == 'absent' }}"
       loop: "{{ managed_users }}"
