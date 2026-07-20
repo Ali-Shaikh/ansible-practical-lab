@@ -27,6 +27,7 @@
         user: "{{ item.name }}"
         key: "{{ lookup('ansible.builtin.file', managed_users_key_file) }}"
         state: present
+        exclusive: true
       loop: "{{ managed_users | selectattr('state', 'eq', 'present') | list }}"
       tags: [users, ssh]
 
