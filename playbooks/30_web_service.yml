@@ -41,16 +41,21 @@
     - name: Apply pending service handlers before verification
       ansible.builtin.meta: flush_handlers
 
+    # The uri module has no check mode, so it is skipped by --check and
+    # leaves health_check without a status. Skip both verification tasks
+    # in check mode rather than let the report fail on a skipped result.
     - name: Check the service answers locally
       ansible.builtin.uri:
         url: http://127.0.0.1/health.html
         status_code: 200
       register: health_check
       become: false
+      when: not ansible_check_mode
 
     - name: Report the health check result
       ansible.builtin.debug:
         msg: "Health endpoint returned {{ health_check.status }}"
+      when: not ansible_check_mode
 
   handlers:
     - name: Reload nginx
