@@ -14,6 +14,13 @@ if ($null -eq $Rest) {
     $Rest = @()
 }
 
+# Compose names built images "<project>-<service>". Read the project name from
+# the compose file so the two cannot drift apart.
+$script:ProjectName = (
+    Select-String -Path (Join-Path $PSScriptRoot "docker-compose.yml") -Pattern '^name:\s*(\S+)' |
+        Select-Object -First 1
+).Matches[0].Groups[1].Value
+
 # The lab estate is docker-compose.yml plus one drop-in file per added host
 # under compose.hosts/. Every compose call must see the same file list.
 $script:BaseComposeFiles = @("-f", "docker-compose.yml")
@@ -56,6 +63,26 @@ function Invoke-SystemdCompose {
 
 function Invoke-Forge {
     Invoke-Compose run --rm forge @args
+}
+
+# Build only the images that are genuinely missing.
+#
+# 'up' and 'systemd' used to pass --build on every run. A rebuild mints a new
+# image id even when every layer is cached, and Compose then recreates every
+# container that uses it, so a second '.\lab.ps1 up' silently threw away
+# whatever had been deployed on the hosts. That also made add-host
+# destructive. 'reset' still rebuilds everything, on purpose.
+function Initialize-LabImages {
+    param([scriptblock]$Runner)
+
+    $services = & $Runner config --services
+    foreach ($svc in $services) {
+        if (-not $svc) { continue }
+        & docker image inspect "$($script:ProjectName)-$svc" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            & $Runner build $svc
+        }
+    }
 }
 
 function Initialize-LabKey {
@@ -202,7 +229,7 @@ all:
     Write-Host "  compose.hosts/$Name.yml"
     Write-Host "  inventory/lab/$Name.yml"
     Write-Host "  inventory/local/$Name.yml"
-    Write-Host "Start it with: .\lab.ps1 up"
+    Write-Host "Start it with: .\lab.ps1 up (or .\lab.ps1 systemd if the estate is in systemd mode)."
 }
 
 function Remove-LabHost {
@@ -282,16 +309,16 @@ switch -Wildcard ($Command) {
     }
     "up" {
         Initialize-LabKey
-        Invoke-Compose build forge
-        Invoke-Compose up -d --build
+        Initialize-LabImages { Invoke-Compose @args }
+        Invoke-Compose up -d
     }
     "systemd" {
         if ($Rest.Count -gt 0) {
             throw "Usage: .\lab.ps1 systemd"
         }
         Initialize-LabKey
-        Invoke-SystemdCompose build forge
-        Invoke-SystemdCompose up -d --build
+        Initialize-LabImages { Invoke-SystemdCompose @args }
+        Invoke-SystemdCompose up -d
         Write-Host ""
         Write-Host "Systemd mode is ready on the four default managed hosts."
         Write-Host "This mode uses privileged containers and a host cgroup mount."
@@ -312,7 +339,7 @@ switch -Wildcard ($Command) {
     }
     "studio" {
         Initialize-LabKey
-        Invoke-Compose up -d --build studio
+        Invoke-Compose up -d studio
         Write-Host ""
         Write-Host "Studio is starting at: http://127.0.0.1:8443"
         Write-Host "Open it in your browser; the integrated terminal is already on the"

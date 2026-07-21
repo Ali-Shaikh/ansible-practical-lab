@@ -9,6 +9,10 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
+# Compose names built images "<project>-<service>". Read the project name from
+# the compose file so the two cannot drift apart.
+PROJECT_NAME="$(awk '/^name:/ {print $2; exit}' docker-compose.yml)"
+
 # The lab estate is docker-compose.yml plus one drop-in file per added host
 # under compose.hosts/. Every compose call must see the same file list.
 BASE_COMPOSE_FILES=(-f docker-compose.yml)
@@ -39,6 +43,24 @@ compose() {
 
 compose_systemd() {
   docker compose "${SYSTEMD_COMPOSE_FILES[@]}" "$@"
+}
+
+# Build only the images that are genuinely missing.
+#
+# `up` and `systemd` used to pass --build on every run. A rebuild mints a new
+# image id even when every layer is cached, and Compose then recreates every
+# container that uses it, so a second `./lab up` silently threw away whatever
+# had been deployed on the hosts. That also made `add-host` destructive: the
+# hint said to run `./lab up` to start the new host, which wiped the others.
+# `reset` still rebuilds everything, on purpose.
+ensure_images_built() {
+  local runner="$1"
+  local svc
+  for svc in $("$runner" config --services); do
+    if ! docker image inspect "${PROJECT_NAME}-${svc}" >/dev/null 2>&1; then
+      "$runner" build "$svc"
+    fi
+  done
 }
 
 ensure_lab_key() {
@@ -189,7 +211,7 @@ COMPOSE
   echo "  compose.hosts/$name.yml"
   echo "  inventory/lab/$name.yml"
   echo "  inventory/local/$name.yml"
-  echo "Start it with: ./lab up"
+  echo "Start it with: ./lab up (or ./lab systemd if the estate is in systemd mode)."
 }
 
 remove_host() {
@@ -214,8 +236,8 @@ case "$COMMAND" in
     ;;
   up)
     ensure_lab_key
-    compose build forge
-    compose up -d --build
+    ensure_images_built compose
+    compose up -d
     ;;
   systemd)
     if [[ $# -gt 0 ]]; then
@@ -223,8 +245,8 @@ case "$COMMAND" in
       exit 2
     fi
     ensure_lab_key
-    compose_systemd build forge
-    compose_systemd up -d --build
+    ensure_images_built compose_systemd
+    compose_systemd up -d
     echo ""
     echo "Systemd mode is ready on the four default managed hosts."
     echo "This mode uses privileged containers and a host cgroup mount."
@@ -245,7 +267,7 @@ case "$COMMAND" in
     ;;
   studio)
     ensure_lab_key
-    compose up -d --build studio
+    compose up -d studio
     echo ""
     echo "Studio is starting at: http://127.0.0.1:8443"
     echo "Open it in your browser; the integrated terminal is already on the"
