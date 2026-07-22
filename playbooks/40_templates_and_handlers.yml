@@ -14,6 +14,21 @@
     web_root: /var/www/html
 
   tasks:
+    # This play stands on its own. It installs and starts nginx before
+    # templating the configuration, so it works against a host that has never
+    # run playbook 30. Both tasks are idempotent, so on a host that has run it
+    # they report ok and change nothing.
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Ensure nginx is running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+
     - name: Render the nginx site configuration
       ansible.builtin.template:
         src: templates/nginx_default_site.conf.j2
