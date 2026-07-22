@@ -347,10 +347,12 @@ switch -Wildcard ($Command) {
         Write-Host "Stop it with: .\lab.ps1 down"
     }
     "ping" {
-        Invoke-Forge ansible all -i inventory/lab -m ansible.builtin.ping
+        # Extra args pass through, so vault flags work once a group_vars file
+        # is encrypted: .\lab.ps1 ping --ask-vault-pass
+        Invoke-Forge ansible all -i inventory/lab -m ansible.builtin.ping @Rest
     }
     "facts" {
-        Invoke-Forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
+        Invoke-Forge ansible-playbook -i inventory/lab playbooks/01_facts.yml @Rest
     }
     "version" {
         if (Test-Path -LiteralPath "VERSION") {

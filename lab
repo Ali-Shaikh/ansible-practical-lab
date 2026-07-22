@@ -275,10 +275,12 @@ case "$COMMAND" in
     echo "Stop it with: ./lab down"
     ;;
   ping)
-    run_forge ansible all -i inventory/lab -m ansible.builtin.ping
+    # Extra args pass through, so vault flags work once a group_vars file is
+    # encrypted: ./lab ping --ask-vault-pass
+    run_forge ansible all -i inventory/lab -m ansible.builtin.ping "$@"
     ;;
   facts)
-    run_forge ansible-playbook -i inventory/lab playbooks/01_facts.yml
+    run_forge ansible-playbook -i inventory/lab playbooks/01_facts.yml "$@"
     ;;
   version)
     if [[ -f VERSION ]]; then
